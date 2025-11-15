@@ -11,19 +11,13 @@ Uses UniProt domain coordinates to map coding variants to their domains:
 For non-coding variants, uses consequence as fallback (e.g., "intronic", "utr").
 """
 
-import logging
 import re
 import sys
 from pathlib import Path
 from typing import Optional, Tuple
 
 import pandas as pd
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+from src.config import logger
 
 CAMPAIGN_ROOT = Path(__file__).resolve().parents[2]
 
@@ -182,4 +176,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

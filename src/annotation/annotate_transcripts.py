@@ -7,18 +7,11 @@ Uses VEP or pyensembl to add transcript IDs, protein changes, exon distances, et
 
 import pandas as pd
 from pathlib import Path
-import logging
 import sys
 from typing import Optional, Dict, Any, List
 import requests
 from pyensembl import EnsemblRelease
-
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+from src.config import logger
 
 CAMPAIGN_ROOT = Path(__file__).resolve().parents[2]
 

@@ -2,7 +2,7 @@
 
 This directory contains three comprehensive, interconnected Marimo notebooks that implement the complete ABCA4 variant intelligence pipeline—from raw data exploration through optimization and reporting.
 
-## 📓 Notebooks Overview
+## Notebooks Overview
 
 ### 1. `01_data_exploration.py` – Data Ingest & Annotation
 
@@ -18,9 +18,9 @@ This directory contains three comprehensive, interconnected Marimo notebooks tha
 - File upload widget for partner TSV data
 - Live filter panels: clinical significance, allele frequency, domain
 - Completeness metrics for each annotation type
-- Auto-export of `variants_annotated.parquet`
+- Auto-export of `abca4_vus_annotated.parquet`
 
-**Output:** `data_processed/annotations/variants_annotated.parquet`
+**Output:** `data_processed/annotations/abca4_vus_annotated.parquet`
 
 ---
 
@@ -68,15 +68,30 @@ This directory contains three comprehensive, interconnected Marimo notebooks tha
 
 ---
 
-## 🚀 Usage
+### 4. `04_fasta_exploration.py` – FASTA Motif Viewer (Optional)
+
+**Purpose:** Explore ABCA4 protein sequence motifs for ATP-binding sites and N-glycosylation patterns.
+
+**Required Input:** `data_raw/sequences/ABCA4_P78363.fasta` (UniProt FASTA format)
+
+**Features:**
+- ATP-binding P-loop/Walker A motifs: `GxxxxGK[ST]`
+- N-glycosylation motifs: `N[^P][ST][^P]`
+- Interactive motif position display
+
+**Note:** This is a utility notebook for protein sequence analysis. The required FASTA file is not included in the repository and must be obtained separately from UniProt (P78363) if motif analysis is needed.
+
+---
+
+## Usage
 
 ### Interactive Editing (Recommended for Development)
 
 ```bash
 # Run all notebooks in interactive edit mode
-marimo edit campaigns/abca4/notebooks/01_data_exploration.py
-marimo edit campaigns/abca4/notebooks/02_feature_engineering.py
-marimo edit campaigns/abca4/notebooks/03_optimization_dashboard.py
+marimo edit notebooks/01_data_exploration.py
+marimo edit notebooks/02_feature_engineering.py
+marimo edit notebooks/03_optimization_dashboard.py
 ```
 
 In edit mode, cells automatically re-run when you modify them, and all widgets are interactive.
@@ -85,9 +100,9 @@ In edit mode, cells automatically re-run when you modify them, and all widgets a
 
 ```bash
 # Deploy as standalone dashboards
-marimo run campaigns/abca4/notebooks/01_data_exploration.py
-marimo run campaigns/abca4/notebooks/02_feature_engineering.py
-marimo run campaigns/abca4/notebooks/03_optimization_dashboard.py
+marimo run notebooks/01_data_exploration.py
+marimo run notebooks/02_feature_engineering.py
+marimo run notebooks/03_optimization_dashboard.py
 ```
 
 Each will start an interactive web app on localhost:3000 (with port increments for multiple instances).
@@ -96,12 +111,12 @@ Each will start an interactive web app on localhost:3000 (with port increments f
 
 ```bash
 # Run as Python scripts with default parameters
-python campaigns/abca4/notebooks/01_data_exploration.py
-python campaigns/abca4/notebooks/02_feature_engineering.py
-python campaigns/abca4/notebooks/03_optimization_dashboard.py
+python notebooks/01_data_exploration.py
+python notebooks/02_feature_engineering.py
+python notebooks/03_optimization_dashboard.py
 ```
 
-## 📊 Data Flow
+## Data Flow
 
 ```
 data_raw/
@@ -113,7 +128,7 @@ data_raw/
 01_data_exploration.py
         ↓
 data_processed/annotations/
-  └── variants_annotated.parquet
+  └── abca4_vus_annotated.parquet
         ↓
 02_feature_engineering.py
         ↓
@@ -129,7 +144,7 @@ data_processed/reports/
   └── report_snapshot.md
 ```
 
-## ⚙️ Configuration
+## Configuration
 
 ### Marimo Runtime Settings (.marimo.toml)
 
@@ -166,7 +181,7 @@ num_iterations = 1000
 
 All downstream cells automatically depend on these parameters—modify them once, and the entire pipeline updates.
 
-## 🔄 Reactivity & Data Binding
+## Reactivity & Data Binding
 
 Marimo's reactive execution model means:
 
@@ -189,12 +204,12 @@ def __(K):
     return selected
 ```
 
-## 📦 Dependencies
+## Dependencies
 
 Install campaign-specific requirements:
 
 ```bash
-pip install -r campaigns/abca4/requirements.txt
+pip install -r requirements.txt
 ```
 
 Key dependencies:
@@ -205,7 +220,7 @@ Key dependencies:
 - **requests:** API calls (VEP, gnomAD)
 - **plotly:** Interactive visualizations
 
-## 🔧 Advanced Usage
+## Advanced Usage
 
 ### Connecting to External Data
 
@@ -219,18 +234,15 @@ DATA_RAW_DIR = Path("/mnt/shared/gnomad_data")  # custom path
 
 ### Custom Scoring Functions
 
-In `02_feature_engineering.py`, replace the placeholder scoring logic:
+The notebook implements **deterministic scoring** using hand-mix weighting or logistic regression:
 
-```python
-# Current (placeholder):
-df_scored["model_score"] = np.random.uniform(0, 1, len(df_scored))
+**Hand-mix mode:** Combines normalized AlphaMissense, SpliceAI, phyloP conservation, and LoF prior scores using adjustable weights.
 
-# Add your function:
-from sklearn.linear_model import LogisticRegression
-clf = LogisticRegression()
-clf.fit(X_train, y_train)
-df_scored["model_score"] = clf.predict_proba(X_test)[:, 1]
-```
+**Logistic regression mode:** Trains a classifier on labeled pathogenic/benign variants to learn optimal feature combinations.
+
+**DEMO_MODE_ENABLED:** Set `DEMO_MODE_ENABLED = True` in `src/config.py` to bypass errors with synthetic data for demonstration purposes.
+
+For production use, ensure all required features are available. The system will fail fast with clear error messages if scoring cannot proceed.
 
 ### Custom Reward Blocks
 
@@ -242,20 +254,20 @@ tfbs_weight = mo.ui.slider(0, 1, value=0.1, label="TFBS Conservation")
 # Then add to the normalized_weights dict
 ```
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 **Issue:** Notebooks won't load / "Missing data_processed/"
 
 **Solution:** Create the directory structure:
 ```bash
-mkdir -p campaigns/abca4/data_processed/{annotations,features,reports}
+mkdir -p data_processed/{annotations,features,reports}
 ```
 
 **Issue:** "Module not found: pyensembl"
 
 **Solution:** Install dependencies:
 ```bash
-pip install -r campaigns/abca4/requirements.txt
+pip install -r requirements.txt
 ```
 
 **Issue:** Widgets don't update downstream cells
@@ -267,7 +279,7 @@ k_value = k_slider.value  # ✓ Correct
 k_value = k_slider  # ✗ Will cause issues
 ```
 
-## 📝 Extending the Pipeline
+## Extending the Pipeline
 
 To add a new analysis step:
 
@@ -292,22 +304,21 @@ To add a new analysis step:
 
 4. **Test reactivity:** Modify a widget that feeds into your cell, and verify it updates.
 
-## 📚 References
+## References
 
 - [Marimo Docs](https://docs.marimo.io/) – Complete framework reference
 - [Marimo GitHub](https://github.com/marimo-team/marimo) – Source & examples
 - [ABCA4 Research](./../../docs/research/) – Campaign-specific literature
 - [Strand SDK](./../../README.md) – Main framework documentation
 
-## 🎯 Next Steps
+## Next Steps
 
 Once you've run all three notebooks:
 
 1. Review the generated `data_processed/reports/report_snapshot.md`
 2. Export selected variants and share with experimental colleagues
-3. Run formal optimization via `campaigns/abca4/src/reward/run_abca4_optimization.py` for batch processing
+3. Run formal optimization via `src/reward/run_abca4_optimization.py` for batch processing
 4. Iterate: adjust weights, try new clustering strategies, and re-run from notebook widgets
 
 ---
 
-**Happy optimizing!** 🧬✨

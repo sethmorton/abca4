@@ -7,16 +7,9 @@ Extracts and processes SpliceAI scores for ABCA4 variants.
 
 import pandas as pd
 from pathlib import Path
-import logging
 import sys
 from typing import Optional
-
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+from src.config import logger
 
 CAMPAIGN_ROOT = Path(__file__).resolve().parents[2]
 

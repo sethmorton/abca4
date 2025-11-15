@@ -20,37 +20,74 @@ def __():
     import pandas as pd
     import numpy as np
     from pathlib import Path
-    import logging
     from typing import Optional, Dict, List, Tuple
     import sys
     import importlib
+    import logging
+    from src.config import DEMO_MODE_ENABLED
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s'
-    )
     logger = logging.getLogger(__name__)
-
-    return mo, pd, np, Path, logging, logger, Optional, Dict, List, Tuple, sys, importlib
+    return mo, pd, np, Path, logger, Optional, Dict, List, Tuple, sys, importlib, DEMO_MODE_ENABLED
 
 
 @app.cell
-def __(mo, Path, logger, pd):
+def __(mo, logger, pd, DEMO_MODE_ENABLED):
     """Define campaign paths and load annotated dataset."""
-    CAMPAIGN_ROOT = Path(__file__).resolve().parents[1]
-    ANNOTATIONS_DIR = CAMPAIGN_ROOT / "data_processed" / "annotations"
-    FEATURES_DIR = CAMPAIGN_ROOT / "data_processed" / "features"
+    from src.config import (
+        CAMPAIGN_ROOT, ANNOTATIONS_DIR, FEATURES_DIR, get_annotated_variants_path,
+        validate_file_exists, load_parquet_safely
+    )
+
+    # Ensure output directory exists
     FEATURES_DIR.mkdir(parents=True, exist_ok=True)
 
-    annotated_path = ANNOTATIONS_DIR / "abca4_vus_annotated.parquet"
-    if not annotated_path.exists():
-        mo.md(f"⚠️ Missing annotated variants at {annotated_path}. Run 01_data_exploration.py first.")
-        df_annotated = pd.DataFrame()
-    else:
-        df_annotated = pd.read_parquet(annotated_path)
+    annotated_path = get_annotated_variants_path()
+    try:
+        validate_file_exists(annotated_path, "Run 01_data_exploration.py first")
+        df_annotated = load_parquet_safely(annotated_path, "annotated variants")
         logger.info(f"Loaded {len(df_annotated)} annotated variants")
+    except (FileNotFoundError, ValueError) as e:
+        if DEMO_MODE_ENABLED:
+            mo.md(f"**Demo Mode:** {str(e)}\n\nUsing synthetic data for demonstration.")
+            # Create minimal demo data
+            df_annotated = pd.DataFrame({
+                'variant_id': [f'demo_{i}' for i in range(10)],
+                'chrom': ['1'] * 10,
+                'pos': range(94400000, 94400010),
+                'ref': ['A'] * 10,
+                'alt': ['T'] * 10,
+                'clinical_significance': ['Uncertain significance'] * 10,
+                'gene_symbol': ['ABCA4'] * 10,
+                'protein_change': ['p.Val123Met'] * 10,
+                'vep_consequence': ['missense_variant'] * 10,
+                'vep_impact': ['MODERATE'] * 10
+            })
+        else:
+            mo.md(f"**Error:** {str(e)}")
+            df_annotated = pd.DataFrame()
 
     return CAMPAIGN_ROOT, ANNOTATIONS_DIR, FEATURES_DIR, annotated_path, df_annotated
+
+
+@app.cell
+def __(mo, df_annotated):
+    """Smoke test: Validate annotated variants dataframe."""
+
+    if df_annotated.empty:
+        mo.md("**Error:** Annotated variants dataframe is empty")
+    else:
+        # Check required columns for feature engineering
+        required_cols = ['variant_id', 'chrom', 'pos', 'ref', 'alt']
+        missing_cols = [col for col in required_cols if col not in df_annotated.columns]
+
+        if missing_cols:
+            mo.md(f"**Error:** Missing required columns: {missing_cols}")
+        else:
+            # Check for key annotation columns
+            key_cols = ['vep_consequence', 'protein_change', 'gene_symbol']
+            present_cols = [col for col in key_cols if col in df_annotated.columns]
+
+            mo.md(f"✅ Annotated variants validation passed\n- Rows: {len(df_annotated)}\n- Required columns: ✓\n- Key annotations: {len(present_cols)}/{len(key_cols)} present")
 
 
 @app.cell
@@ -61,41 +98,43 @@ def __(mo, pd, df_annotated):
     Verify input data quality before scoring.
     """
     if df_annotated.empty:
-        audit_text = "⚠️ No data loaded"
+        audit_text = "No data loaded"
     else:
         # Check completeness
         total = len(df_annotated)
         ref_good = (df_annotated['ref'] != 'na').sum()
         alt_good = (df_annotated['alt'] != 'na').sum()
+        ref_good_pct = 100 * ref_good / total if total > 0 else 0
+        complex_count = total - ref_good
         protein_complete = df_annotated['protein_change'].notna().sum()
         consequence_complete = df_annotated['vep_consequence'].notna().sum()
-        
+
         audit_text = f"""
-        ### Data Quality Status: ✅ EXCELLENT
-        
+        ### Data Quality Summary
+
         **Base Variant Set:**
         - Total variants: **{total:,}**
-        - Ref/Alt quality: **{ref_good}/{total}** (99.8% good, 4 complex/structural)
+        - Ref/Alt quality: **{ref_good}/{total}** ({ref_good_pct:.1f}% good, {complex_count} complex/structural)
         - Unique positions: **{df_annotated['pos'].nunique():,}**
         - Duplicate IDs: **{total - df_annotated['variant_id'].nunique()}** (negligible)
-        
+
         **Annotations:**
         - Transcript coverage: **100%** (all have canonical transcript)
         - Protein changes: **{protein_complete}/{total}** ({100*protein_complete/total:.1f}%)
           - Why gaps? Non-missense variants (introns, UTR, synonymous) correctly have no protein change
         - VEP consequences: **{consequence_complete}/{total}** ({100*consequence_complete/total:.1f}%)
-        
+
         **Impact Distribution:**
         - MODERATE impact (missense, etc.): **{(df_annotated['vep_impact'] == 'MODERATE').sum()}**
         - LOW impact (synonymous, UTR): **{(df_annotated['vep_impact'] == 'LOW').sum()}**
         - MODIFIER/other: **{(df_annotated['vep_impact'].isin(['MODIFIER', 'HIGH'])).sum()}**
-        
+
         **Data Quality Interpretation:**
-        ✅ All 99.8% of variants have proper ref/alt (after ReferenceAlleleVCF fix)  
-        ✅ 100% have transcript annotations  
-        ✅ Gaps in protein changes are CORRECT (non-missense shouldn't have them)  
-        ✅ VEP impacts properly classified  
-        ✅ Ready for feature engineering  
+        {ref_good_pct:.1f}% of variants have proper ref/alt (after ReferenceAlleleVCF fix)
+        {100*consequence_complete/total:.1f}% have transcript annotations
+        Gaps in protein changes are CORRECT (non-missense shouldn't have them)
+        VEP impacts properly classified
+        Ready for feature engineering
         """
     
     mo.md(audit_text)
@@ -194,6 +233,10 @@ def __(
                 logger.warning("Conservation feature computation failed; using fallback")
                 df_cons = pd.DataFrame()
                 status = "fallback"
+
+        # Standardize column names
+        from src.config import standardize_conservation_columns
+        df_cons = standardize_conservation_columns(df_cons)
         feature_sources.append((df_cons, 'variant_id'))
         feature_logs.append({"feature": "conservation", "status": status, "rows": len(df_cons)})
     except Exception as e:
@@ -244,7 +287,7 @@ def __(
         'conservation': {
             'file': str(FEATURES_DIR / "conservation_features.parquet"),
             'columns': ['phylop_score', 'phastcons_score'],
-            'description': 'Phylogenetic conservation (phyloP and phastCons)'
+            'description': 'Phylogenetic conservation (phylop_score and phastCons)'
         },
         'regulatory': {
             'file': str(FEATURES_DIR / "regulatory_features.parquet"),
@@ -290,7 +333,7 @@ def __(
 def __(mo, pd, df_scored_step3, features_raw_path):
     """Display raw features output path and schema."""
     mo.md(f"""
-    ### ✅ Raw Features Saved
+    ### Raw Features Saved
 
     **Output Path:** `{features_raw_path}`
 
@@ -353,7 +396,7 @@ def __(mo, pd, df_scored_step3):
     splice_mean = df_scored_step3[splice_col].mean() if splice_col in df_scored_step3.columns else 0
     
     # Conservation analysis
-    cons_col = 'phyloP100way'
+    cons_col = 'phylop_score'
     cons_non_null = df_scored_step3[cons_col].notna().sum() if cons_col in df_scored_step3.columns else 0
     cons_pct = 100 * cons_non_null / total_vars if cons_col in df_scored_step3.columns else 0
     
@@ -364,29 +407,29 @@ def __(mo, pd, df_scored_step3):
     audit_md = f"""
 **AlphaMissense Scores:**
 - Available: **{am_non_null}/{total_vars}** ({am_pct:.1f}%)
-- ✅ Expected: Non-missense variants (introns, UTR, synonymous) correctly have no score
+- Expected: Non-missense variants (introns, UTR, synonymous) correctly have no score
 - Why gaps? See Data Quality Audit above - protein_change is missing for {100-100*df_scored_step3['protein_change'].notna().sum()/total_vars:.1f}% of variants
 
 **SpliceAI Scores:**
-- Coverage: **{splice_non_null}/{total_vars}** (100%)
-- Mean score: **{splice_mean:.4f}** ✅ (mostly benign, as expected)
+- Coverage: **{splice_non_null}/{total_vars}** ({splice_pct:.1f}%)
+- Mean score: **{splice_mean:.4f}** (mostly benign, as expected)
 - High-impact (≥0.8): **{(df_scored_step3[splice_col] >= 0.8).sum() if splice_col in df_scored_step3.columns else 0}** variants
 
 **Conservation (phyloP):**
-- Coverage: **{cons_non_null}/{total_vars}** (100%)
+- Coverage: **{cons_non_null}/{total_vars}** ({cons_pct:.1f}%)
 - Mean: **{df_scored_step3[cons_col].mean():.2f}** (good variance)
-- Provides signal for all variants ✅
+- Provides signal for all variants
 
 **LoF Prior:**
-- Coverage: **{lof_non_null}/{total_vars}** (100%)
+- Coverage: **{lof_non_null}/{total_vars}** ({100*lof_non_null/total_vars:.1f}%)
 - Based on VEP consequence
-- Provides baseline signal for all variants ✅
+- Provides baseline signal for all variants
 
 **Data Quality Summary:**
-✅ All {total_vars:,} variants will get a model_score  
-✅ No missing values (NaN-free) - using hand-mix approach  
-✅ Signal diversity: AlphaMissense (41.7%) + SpliceAI (100%) + Conservation (100%) + LoF (100%)  
-✅ Robust scoring even when individual features are missing
+All {total_vars:,} variants will get a model_score
+No missing values (NaN-free) - using hand-mix approach
+Signal diversity: AlphaMissense ({am_pct:.1f}%) + SpliceAI ({splice_pct:.1f}%) + Conservation ({cons_pct:.1f}%) + LoF ({100*lof_non_null/total_vars:.1f}%)
+Robust scoring even when individual features are missing
 """
     
     mo.md(audit_md)
@@ -598,7 +641,7 @@ def __(
     """Compute impact scores using hand-mix or logistic regression."""
     
     df_impact = df_scored_step3.copy()
-    scoring_fallback_used = False
+    scoring_error = None
 
     if scoring_mode_widget.value == "hand-mix" and alpha_wgt is not None:
         # Normalize scores to [0, 1]
@@ -614,7 +657,7 @@ def __(
 
         _alpha_norm = _normalize_score("alphamissense_score")
         _splice_norm = _normalize_score("spliceai_max_score")
-        _cons_norm = _normalize_score("phyloP100way")
+        _cons_norm = _normalize_score("phylop_score")
         _lof_norm = df_impact["lof_prior"].fillna(0.0)
 
         _total_wgt = (
@@ -650,16 +693,17 @@ def __(
             
             logger.info(f"Computed logistic regression impact scores. Mean: {df_impact['model_score'].mean():.3f}")
         except Exception as e:
-            logger.error(f"Logistic regression scoring failed: {e}; using uniform fallback")
-            df_impact["model_score"] = np.random.uniform(0, 1, len(df_impact))
-            scoring_fallback_used = True
+            scoring_error = f"Logistic regression scoring failed: {e}"
+            logger.error(scoring_error)
     else:
-        # Fallback: uniform random
-        df_impact["model_score"] = np.random.uniform(0, 1, len(df_impact))
-        logger.info("Using uniform random fallback for impact scores")
-        scoring_fallback_used = True
+        scoring_error = f"Unsupported scoring mode: {scoring_mode_widget.value}"
 
-    df_impact.attrs['scoring_fallback_used'] = scoring_fallback_used
+    if scoring_error:
+        df_impact = df_scored_step3.copy()  # Return original data without scores
+        df_impact.attrs['scoring_error'] = scoring_error
+    else:
+        df_impact.attrs['scoring_error'] = None
+
     return df_impact
 
 
@@ -671,25 +715,34 @@ def __():
 
 
 @app.cell
-def __(mo, df_impact):
-    """Check and display scoring fallback warning."""
-    fallback_used = df_impact.attrs.get('scoring_fallback_used', False)
-    
-    if fallback_used:
-        mo.md("""
-        ⚠️ **FALLBACK WARNING: Uniform Random Scores**
-        
-        Model scoring failed and fell back to uniform random sampling.
-        **These scores are NOT meaningful** and should not be used for downstream analysis.
-        
-        **What to do:**
-        1. Check the logging output above for error details
-        2. Verify that required feature columns are present
-        3. Switch to hand-mix mode and set weights manually
-        4. Re-run the scoring cell
-        """)
+def __(mo, df_impact, DEMO_MODE_ENABLED):
+    """Check and display scoring error or success."""
+    _scoring_error = df_impact.attrs.get('scoring_error')
+
+    if _scoring_error:
+        if DEMO_MODE_ENABLED:
+            mo.md(f"""
+            **Demo Mode: Scoring Error Bypassed**
+
+            Scoring failed with error: {_scoring_error}
+
+            Using demo data for demonstration purposes only.
+            Results are not meaningful for real analysis.
+            """)
+        else:
+            mo.md(f"""
+            **Scoring Error: Cannot Proceed**
+
+            {_scoring_error}
+
+            **Required Actions:**
+            1. Check that all required feature columns are present
+            2. Ensure scoring mode is properly configured
+            3. Enable DEMO_MODE_ENABLED in src/config.py for demo data
+            4. Fix the underlying issue before proceeding
+            """)
     else:
-        mo.md("✅ **Scores computed successfully** using configured mode.")
+        mo.md("✅ Scores computed successfully using configured mode.")
 
 
 @app.cell
@@ -775,8 +828,18 @@ def __(
     df_clusters = df_impact.copy()
     
     # Add domain info if available
-    if not df_domains.empty and 'domain' in df_domains.columns:
-        df_clusters['domain'] = df_domains['domain'].values
+    if not df_domains.empty and 'domain' in df_domains.columns and 'variant_id' in df_domains.columns:
+        # Merge on variant_id to preserve ordering and avoid positional issues
+        df_clusters = df_clusters.merge(
+            df_domains[['variant_id', 'domain']],  # Only merge domain column
+            on='variant_id',
+            how='left',
+            suffixes=('', '_domain')
+        )
+        # Handle any conflicts from merge
+        if 'domain_domain' in df_clusters.columns:
+            df_clusters['domain'] = df_clusters['domain'].fillna(df_clusters['domain_domain'])
+            df_clusters = df_clusters.drop('domain_domain', axis=1)
         
         # Apply domain-aware boosting (critical domains get score bonus)
         domain_boost = {
@@ -803,14 +866,33 @@ def __(
         logger.warning("Domain info not available; skipping domain-aware boosting")
         df_clusters['domain'] = 'unknown'
 
-    # Assign clusters by mechanism (consequence-based, primary clustering)
+    # Assign clusters by domain or consequence
     if clustering_widget.value == "domain":
-        # Fall back to mechanism clustering as primary
-        if "consequence" in df_clusters.columns:
-            df_clusters["cluster"] = df_clusters["consequence"].fillna("other")
+        # Primary clustering by domain, secondary by consequence
+        if "domain" in df_clusters.columns and df_clusters["domain"].notna().any():
+            # Group by domain first
+            df_clusters["cluster"] = df_clusters["domain"].fillna("unknown")
+
+            # For domains with many variants, sub-cluster by consequence
+            domain_counts = df_clusters["cluster"].value_counts()
+            large_domains = domain_counts[domain_counts > 10].index
+
+            for domain in large_domains:
+                mask = df_clusters["cluster"] == domain
+                if "consequence" in df_clusters.columns:
+                    # Create sub-clusters within large domains
+                    sub_cluster = df_clusters.loc[mask, "consequence"].fillna("other")
+                    df_clusters.loc[mask, "cluster"] = sub_cluster.astype(str).radd(f"{domain}_")
+
+            logger.info(f"Domain-based clustering: {df_clusters['cluster'].nunique()} clusters")
         else:
-            df_clusters["cluster"] = "other"
-        logger.info(f"Primary clustering by consequence: {df_clusters['cluster'].nunique()} clusters")
+            # Fallback to consequence clustering if domain info unavailable
+            logger.warning("Domain info unavailable; falling back to consequence clustering")
+            if "consequence" in df_clusters.columns:
+                df_clusters["cluster"] = df_clusters["consequence"].fillna("other")
+            else:
+                df_clusters["cluster"] = "other"
+            logger.info(f"Consequence-based clustering: {df_clusters['cluster'].nunique()} clusters")
 
     elif clustering_widget.value == "consequence":
         if "consequence" in df_clusters.columns:
@@ -951,11 +1033,11 @@ def __(
 def __(mo, pd, df_final_scored):
     """Display Step 5 clustering summary."""
     mo.md("""
-    ### ✅ Step 5: Clustering & Coverage Complete
-    
+    ### Step 5: Clustering & Coverage Complete
+
     **Cluster Structure:**
     """)
-    
+
     if "cluster_id" in df_final_scored.columns:
         _cluster_summary = df_final_scored.groupby("cluster_id").agg({
             "model_score": ["count", "max", "mean", "min"],
@@ -965,7 +1047,7 @@ def __(mo, pd, df_final_scored):
         _cluster_summary.columns = ["Variants", "Max Score", "Mean Score", "Min Score", "τⱼ Target", "cov_j(S)"]
         mo.ui.table(_cluster_summary.reset_index())
     else:
-        mo.md("⚠️ Cluster information not available")
+        mo.md("Cluster information not available")
 
 
 @app.cell
@@ -993,8 +1075,8 @@ def __(mo, pd, logger, df_final_scored, FEATURES_DIR):
     logger.info(f"Wrote scored & clustered variants")
     
     mo.md(f"""
-    ✅ **Feature Engineering Complete!**
-    
+    **Feature Engineering Complete**
+
     **Output Path:** `{_final_path_confirm}`
     
     **Dataset Shape:** {df_final_scored.shape[0]} variants × {df_final_scored.shape[1]} columns

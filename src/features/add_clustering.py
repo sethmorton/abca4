@@ -8,18 +8,12 @@ Ensures every variant has:
 - coverage_by_cluster: cov_j(S) = max impact_score in cluster
 """
 
-import logging
 import sys
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+from src.config import logger
 
 CAMPAIGN_ROOT = Path(__file__).resolve().parents[2]
 
@@ -198,4 +192,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

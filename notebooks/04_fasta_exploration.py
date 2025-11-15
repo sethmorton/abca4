@@ -89,7 +89,7 @@ def __(read_fasta_sequence, find_motifs):
         
         view = mo.vstack([atp_output, nglyc_output])
     except FileNotFoundError:
-        view = mo.md(f"⚠️ FASTA file not found at `{fasta_path}`")
+        view = mo.md(f"FASTA file not found at `{fasta_path}`")
 
     return view,
 
