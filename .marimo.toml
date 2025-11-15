@@ -1,0 +1,38 @@
+# ABCA4 Campaign - marimo Configuration
+# This file configures marimo notebook behavior, theming, and runtime settings
+# for the ABCA4 variant intelligence campaign.
+
+[runtime]
+# Enable reactive execution: cells run when dependencies change
+auto_instantiate = true
+# Run cells only when outputs are needed (lazy evaluation)
+on_cell_change = "lazy"
+
+[display]
+# Light theme for readability (particularly good for data-heavy notebooks)
+theme = "light"
+# Use full width for better data exploration
+default_width = "full"
+# Show output by default
+show_output = true
+
+[formatting]
+# Use 100 character line length (common in scientific Python)
+line_length = 100
+
+[editor]
+# Auto-format code on save using Ruff
+auto_formatting = true
+# Show line numbers for easier reference
+line_numbers = true
+# Enable bracket matching
+bracket_matching = true
+
+[package_management]
+# Use uv for package management (fast, modern Python package manager)
+package_manager = "uv"
+
+[notebook]
+# Auto-reload files when changed externally
+watch_files = true
+

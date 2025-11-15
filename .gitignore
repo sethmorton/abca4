@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Environments
+.venv/
+venv/
+.env
+
+# Marimo caches
+**/__marimo__/
+*.marimo
+
+# Data (large/unversioned)
+data_raw/
+data_processed/
+
+# MLflow
+mlruns/
+.mlflow/
+
+# OS/IDE
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

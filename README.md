@@ -1,0 +1,145 @@
+# 🧬 ABCA4 Variant Intelligence Campaign
+
+This folder contains an end-to-end rare-variant intelligence pipeline for ABCA4, a gene involved in Stargardt macular degeneration. The campaign is completely self-contained so the main `strand-sdk` framework remains clean and reusable for other campaigns.
+
+## 📂 Folder Structure
+
+```
+campaigns/abca4/
+├── notebooks/                # Interactive Marimo analysis notebooks
+│   ├── 01_data_exploration.py          - Data discovery & filtering
+│   ├── 02_feature_engineering.py       - Feature computation & tuning  
+│   ├── 03_optimization_dashboard.py    - Results analysis & visualization
+│   └── 04_fasta_exploration.py         - Sequence analysis & motif detection
+├── src/                      # Reusable pipeline modules
+│   ├── data/                 - Download & preprocessing scripts
+│   ├── features/             - Feature computation (conservation, splice, etc)
+│   ├── annotation/           - Transcript & domain annotation
+│   └── reporting/            - Report generation
+├── docs/                     # Research notes & documentation
+├── data_raw/                 # Original data sources (git-ignored)
+├── data_processed/           # Computed outputs (git-ignored)
+├── requirements.txt          # Campaign dependencies
+├── tasks.py                  # Invoke task automation
+└── .marimo.toml             # Marimo configuration (light theme, uv package manager)
+```
+
+## 🚀 Quick Start
+
+### Setup (UV Package Manager)
+
+This project uses **`uv`** for fast, isolated Python dependency management and **`marimo`** for interactive notebooks.
+
+**System Requirements:** Only `uv` is needed. All 127 Python dependencies have prebuilt wheels for Python 3.12 on macOS/Linux/Windows, so no system libraries (gcc, build tools, etc.) are required.
+
+**Why Python 3.12?** PyArrow (via MLflow) doesn't have prebuilt wheels for Python 3.14 or early 3.13 on macOS ARM64. Without prebuilt wheels, it attempts to build from source, requiring system-level Apache Arrow C++ libraries. Python 3.12 has stable precompiled wheels, so everything installs instantly.
+
+```bash
+# Install all dependencies (including optional extras for marimo & plotly)
+uv sync --all-extras
+
+# Verify all notebooks
+for nb in notebooks/*.py; do uv run marimo check "$nb"; done
+```
+
+**What gets installed:**
+- ✓ NumPy, Pandas, SciPy — data science
+- ✓ BioPython, PySAM, PyEnsembl — bioinformatics
+- ✓ MLflow, requests, PyYAML — utilities
+- ✓ Marimo, Plotly — interactive notebooks & visualization
+- ✗ No system dependencies needed
+
+### Running Invoke Tasks
+
+Run tasks from the repo root:
+
+```bash
+invoke -l                        # list all available tasks
+invoke download-data             # fetch ClinVar/gnomAD/SpliceAI/AlphaMissense
+invoke run-pipeline              # execute full feature computation pipeline
+invoke run-optimization          # rank variants & log to MLflow
+invoke generate-report           # generate snapshot reports
+```
+
+### Interactive Notebooks
+
+Edit notebooks interactively:
+
+```bash
+uv run marimo edit notebooks/01_data_exploration.py
+uv run marimo edit notebooks/02_feature_engineering.py
+uv run marimo edit notebooks/03_optimization_dashboard.py
+uv run marimo edit notebooks/04_fasta_exploration.py
+```
+
+### Running Notebooks as Dashboards
+
+Deploy as standalone interactive dashboards:
+
+```bash
+uv run marimo run notebooks/01_data_exploration.py --headless
+uv run marimo run notebooks/03_optimization_dashboard.py --headless
+```
+
+### Running Notebooks as Scripts
+
+Execute notebooks as Python scripts with CLI arguments:
+
+```bash
+uv run python notebooks/01_data_exploration.py
+```
+
+## 📊 Notebook Guide
+
+| Notebook | Purpose | Use Case |
+|----------|---------|----------|
+| **01_data_exploration.py** | Interactive data filtering & summary statistics | Explore raw variants, apply filters, see distribution plots |
+| **02_feature_engineering.py** | Feature computation & weight tuning | Experiment with feature combinations, visualize importance |
+| **03_optimization_dashboard.py** | Results visualization & comparison | View optimization progress, analyze sensitivity, compare methods |
+| **04_fasta_exploration.py** | Sequence analysis | Find motifs, explore protein structure, sequence patterns |
+
+## 🔬 Pipeline Flow
+
+```
+data_raw/                    Download raw data (ClinVar, gnomAD, etc)
+    ↓
+src/data/                    Preprocess & filter variants
+    ↓
+src/features/                Compute features (conservation, splice, missense)
+    ↓
+data_processed/features/     Store feature matrix
+    ↓
+notebooks/                   Explore & optimize with interactive dashboards
+    ↓
+data_processed/reports/      Export top variants & reports
+```
+
+## ⚙️ Configuration
+
+The `.marimo.toml` file configures:
+- **Theme**: Light (optimized for data visualization readability)
+- **Runtime**: Lazy evaluation (cells run only when outputs needed)
+- **Package Manager**: uv (fast Python package management)
+- **Formatting**: Auto-format on save with Ruff
+
+## 🔗 Resources
+
+**Download ABCA4 FASTA Sequence:**
+
+```bash
+curl -o data_raw/sequences/ABCA4_P78363.fasta \
+  https://rest.uniprot.org/uniprotkb/P78363.fasta
+```
+
+**References:**
+- [ClinVar ABCA4](https://www.ncbi.nlm.nih.gov/clinvar/?term=ABCA4)
+- [UniProt ABCA4](https://www.uniprot.org/uniprotkb/P78363)
+- [Stargardt Disease Info](https://www.nei.nih.gov/learn-about-eye-health/eye-conditions-and-diseases/stargardt-disease)
+
+## 📝 Development Notes
+
+- All scripts assume paths relative to this campaign folder
+- Data directories (`data_raw/`, `data_processed/`) are git-ignored for size management
+- Notebooks are stored as pure `.py` files (Git-friendly, reactive)
+- Use `tasks.py` for reproducible pipeline automation
+- Session state (`.marimo/`) is automatically managed and ignored

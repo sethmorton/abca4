@@ -1,0 +1,142 @@
+Metadata-Version: 2.4
+Name: abca4-campaign
+Version: 0.1.0
+Summary: ABCA4 variant triage campaign (notebooks + pipeline)
+Author: ABCA4 Team
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: pandas>=2.1
+Requires-Dist: numpy<2.0,>=1.26
+Requires-Dist: scipy>=1.12
+Requires-Dist: requests>=2.31.0
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: biopython>=1.81
+Requires-Dist: pysam>=0.23.3
+Requires-Dist: pyensembl>=2.2
+Requires-Dist: mlflow>=2.14
+Provides-Extra: interactive
+Requires-Dist: marimo>=0.17.8; extra == "interactive"
+Requires-Dist: plotly>=5.15.0; extra == "interactive"
+
+# 🧬 ABCA4 Variant Intelligence Campaign
+
+This folder contains an end-to-end rare-variant intelligence pipeline for ABCA4, a gene involved in Stargardt macular degeneration. The campaign is completely self-contained so the main `strand-sdk` framework remains clean and reusable for other campaigns.
+
+## 📂 Folder Structure
+
+```
+campaigns/abca4/
+├── notebooks/                # Interactive Marimo analysis notebooks
+│   ├── 01_data_exploration.py          - Data discovery & filtering
+│   ├── 02_feature_engineering.py       - Feature computation & tuning  
+│   ├── 03_optimization_dashboard.py    - Results analysis & visualization
+│   └── 04_fasta_exploration.py         - Sequence analysis & motif detection
+├── src/                      # Reusable pipeline modules
+│   ├── data/                 - Download & preprocessing scripts
+│   ├── features/             - Feature computation (conservation, splice, etc)
+│   ├── annotation/           - Transcript & domain annotation
+│   └── reporting/            - Report generation
+├── docs/                     # Research notes & documentation
+├── data_raw/                 # Original data sources (git-ignored)
+├── data_processed/           # Computed outputs (git-ignored)
+├── requirements.txt          # Campaign dependencies
+├── tasks.py                  # Invoke task automation
+└── .marimo.toml             # Marimo configuration (light theme, uv package manager)
+```
+
+## 🚀 Quick Start
+
+### Running Invoke Tasks
+
+Run tasks from the repo root:
+
+```bash
+invoke -l                        # list all available tasks
+invoke download-data             # fetch ClinVar/gnomAD/SpliceAI/AlphaMissense
+invoke run-pipeline              # execute full feature computation pipeline
+invoke run-optimization          # rank variants & log to MLflow
+invoke generate-report           # generate snapshot reports
+```
+
+### Interactive Notebooks
+
+Edit notebooks interactively:
+
+```bash
+marimo edit campaigns/abca4/notebooks/01_data_exploration.py
+marimo edit campaigns/abca4/notebooks/02_feature_engineering.py
+marimo edit campaigns/abca4/notebooks/03_optimization_dashboard.py
+marimo edit campaigns/abca4/notebooks/04_fasta_exploration.py
+```
+
+### Running Notebooks as Dashboards
+
+Deploy as standalone interactive dashboards:
+
+```bash
+marimo run campaigns/abca4/notebooks/01_data_exploration.py
+marimo run campaigns/abca4/notebooks/03_optimization_dashboard.py
+```
+
+### Running Notebooks as Scripts
+
+Execute notebooks as Python scripts with CLI arguments:
+
+```bash
+python campaigns/abca4/notebooks/01_data_exploration.py
+```
+
+## 📊 Notebook Guide
+
+| Notebook | Purpose | Use Case |
+|----------|---------|----------|
+| **01_data_exploration.py** | Interactive data filtering & summary statistics | Explore raw variants, apply filters, see distribution plots |
+| **02_feature_engineering.py** | Feature computation & weight tuning | Experiment with feature combinations, visualize importance |
+| **03_optimization_dashboard.py** | Results visualization & comparison | View optimization progress, analyze sensitivity, compare methods |
+| **04_fasta_exploration.py** | Sequence analysis | Find motifs, explore protein structure, sequence patterns |
+
+## 🔬 Pipeline Flow
+
+```
+data_raw/                    Download raw data (ClinVar, gnomAD, etc)
+    ↓
+src/data/                    Preprocess & filter variants
+    ↓
+src/features/                Compute features (conservation, splice, missense)
+    ↓
+data_processed/features/     Store feature matrix
+    ↓
+notebooks/                   Explore & optimize with interactive dashboards
+    ↓
+data_processed/reports/      Export top variants & reports
+```
+
+## ⚙️ Configuration
+
+The `.marimo.toml` file configures:
+- **Theme**: Light (optimized for data visualization readability)
+- **Runtime**: Lazy evaluation (cells run only when outputs needed)
+- **Package Manager**: uv (fast Python package management)
+- **Formatting**: Auto-format on save with Ruff
+
+## 🔗 Resources
+
+**Download ABCA4 FASTA Sequence:**
+
+```bash
+curl -o data_raw/sequences/ABCA4_P78363.fasta \
+  https://rest.uniprot.org/uniprotkb/P78363.fasta
+```
+
+**References:**
+- [ClinVar ABCA4](https://www.ncbi.nlm.nih.gov/clinvar/?term=ABCA4)
+- [UniProt ABCA4](https://www.uniprot.org/uniprotkb/P78363)
+- [Stargardt Disease Info](https://www.nei.nih.gov/learn-about-eye-health/eye-conditions-and-diseases/stargardt-disease)
+
+## 📝 Development Notes
+
+- All scripts assume paths relative to this campaign folder
+- Data directories (`data_raw/`, `data_processed/`) are git-ignored for size management
+- Notebooks are stored as pure `.py` files (Git-friendly, reactive)
+- Use `tasks.py` for reproducible pipeline automation
+- Session state (`.marimo/`) is automatically managed and ignored

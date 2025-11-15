@@ -1,0 +1,54 @@
+{
+  "gene": "ABCA4",
+  "transcript": "ENST00000370225",
+  "domains": [
+    {"name": "N-terminal TM", "start": 40, "end": 630, "class": "transmembrane"},
+    {"name": "ECD1", "start": 631, "end": 930, "class": "extracellular"},
+    {"name": "NBD1", "start": 931, "end": 1168, "class": "nucleotide_binding"},
+    {"name": "Linker", "start": 1169, "end": 1740, "class": "flexible"},
+    {"name": "ECD2", "start": 1741, "end": 2060, "class": "extracellular"},
+    {"name": "NBD2", "start": 2061, "end": 2300, "class": "nucleotide_binding"}
+  ],
+  "regulatory_regions": [
+    {
+      "name": "promoter_core",
+      "type": "promoter",
+      "chrom": "1",
+      "start": 94036000,
+      "end": 94041000,
+      "priority": 1.0
+    },
+    {
+      "name": "promoter_flank",
+      "type": "promoter",
+      "chrom": "1",
+      "start": 94033000,
+      "end": 94045000,
+      "priority": 0.8
+    },
+    {
+      "name": "retina_enhancer_super",
+      "type": "enhancer",
+      "chrom": "1",
+      "start": 94120000,
+      "end": 94142000,
+      "priority": 0.7
+    },
+    {
+      "name": "intronic_enhancer_cluster",
+      "type": "enhancer",
+      "chrom": "1",
+      "start": 94245000,
+      "end": 94278000,
+      "priority": 0.6
+    },
+    {
+      "name": "distal_regulatory_island",
+      "type": "regulatory_island",
+      "chrom": "1",
+      "start": 94380000,
+      "end": 94398000,
+      "priority": 0.5
+    }
+  ]
+}
