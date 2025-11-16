@@ -512,9 +512,12 @@ def __(
     else:
         df_mapped = optim_results['selected_variants'].copy()
 
-        # Compute cov_j(S) for the selected set
+        # Compute cov_j(S) for the selected set using impact_score when available
         if 'cluster_id' in df_mapped.columns:
-            cov_s = df_mapped.groupby('cluster_id')['optimization_score'].max().to_dict()
+            _cov_col = 'impact_score' if 'impact_score' in df_mapped.columns else (
+                'model_score' if 'model_score' in df_mapped.columns else 'optimization_score'
+            )
+            cov_s = df_mapped.groupby('cluster_id')[_cov_col].max().to_dict()
             df_mapped['cov_j_selected'] = df_mapped['cluster_id'].map(cov_s)
 
         # Find consequence column (may have various names)

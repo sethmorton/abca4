@@ -50,6 +50,13 @@ def __(mo, logger, pd, DEMO_MODE_ENABLED):
         validate_file_exists(annotated_path, "Run 01_data_exploration.py first")
         df_annotated = load_parquet_safely(annotated_path, "annotated variants")
         logger.info(f"Loaded {len(df_annotated)} annotated variants")
+
+        # Clean obvious garbage ref/alt values (e.g., "na")
+        bad_mask = df_annotated['ref'].astype(str).str.lower().eq('na') | df_annotated['alt'].astype(str).str.lower().eq('na')
+        if bad_mask.any():
+            n_bad = int(bad_mask.sum())
+            df_annotated = df_annotated.loc[~bad_mask].copy()
+            logger.warning(f"Dropped {n_bad} variants with invalid ref/alt = 'na'")
     except (FileNotFoundError, ValueError) as e:
         if DEMO_MODE_ENABLED:
             mo.md(f"**Demo Mode:** {str(e)}\n\nUsing synthetic data for demonstration.")
@@ -327,6 +334,7 @@ def __(
     pd, df_scored_step3, logger, FEATURES_DIR
 ):
     """Save intermediate features."""
+    # Export a clean raw snapshot that now includes model_score/impact inputs (if already computed downstream)
     features_raw_path = FEATURES_DIR / "variants_features_raw.parquet"
     df_scored_step3.to_parquet(features_raw_path)
     features_raw_csv = FEATURES_DIR / "variants_features_raw.csv"
@@ -771,6 +779,20 @@ def __():
     """Import plotly for visualizations."""
     import plotly.graph_objects as go
     return go
+
+
+@app.cell
+def __(
+    pd, logger, FEATURES_DIR, df_impact
+):
+    """Overwrite raw features file with scores so model_score is always present for downstream checks."""
+    _features_raw_path = FEATURES_DIR / "variants_features_raw.parquet"
+    _features_raw_csv = FEATURES_DIR / "variants_features_raw.csv"
+    df_impact.to_parquet(_features_raw_path)
+    df_impact.to_csv(_features_raw_csv, index=False)
+    logger.info(f"Updated raw features (with model_score/impact inputs) at {_features_raw_path} and {_features_raw_csv}")
+
+    return None
 
 
 @app.cell
