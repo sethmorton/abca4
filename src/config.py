@@ -83,9 +83,9 @@ def load_parquet_safely(path: Path, name: str) -> pd.DataFrame:
 
 # Conservation column mapping for consistency
 CONSERVATION_COLUMN_MAP = {
-    'conservation': 'phylop_score',
-    'phyloP': 'phylop_score',
-    'phylop': 'phylop_score'
+    'phyloP100way': 'phylop_score',
+    'phastCons100way': 'phastcons_score',
+    'conservation_score': 'phylop_score'  # Use phyloP as primary conservation score
 }
 
 

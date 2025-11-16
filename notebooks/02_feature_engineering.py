@@ -325,7 +325,9 @@ def __(
     """Save intermediate features."""
     features_raw_path = FEATURES_DIR / "variants_features_raw.parquet"
     df_scored_step3.to_parquet(features_raw_path)
-    logger.info(f"Wrote raw features to {features_raw_path}")
+    features_raw_csv = FEATURES_DIR / "variants_features_raw.csv"
+    df_scored_step3.to_csv(features_raw_csv, index=False)
+    logger.info(f"Wrote raw features to {features_raw_path} and {features_raw_csv}")
     return features_raw_path
 
 
@@ -704,6 +706,59 @@ def __(
     else:
         df_impact.attrs['scoring_error'] = None
 
+    # --- Plan-conformant feature vector ----------------------------------
+    # cons_v: scaled conservation (0-1)
+    if 'phylop_score' in df_impact.columns:
+        _cons = df_impact['phylop_score'].fillna(0.0)
+        _cons_range = _cons.max() - _cons.min()
+        df_impact['cons_scaled'] = (
+            (_cons - _cons.min()) / _cons_range if _cons_range > 0 else np.zeros(len(df_impact))
+        ).clip(0, 1)
+    else:
+        df_impact['cons_scaled'] = 0.0
+
+    # af_v_transformed: rarity -> higher suspicion, common -> lower suspicion
+    _af_col = next((c for c in [
+        'gnomad_max_af', 'gnomad_exome_af', 'gnomad_genome_af', 'faf95_max'
+    ] if c in df_impact.columns), None)
+
+    if _af_col:
+        _af_raw = df_impact[_af_col].fillna(0.0)
+        _af_clipped = _af_raw.clip(lower=1e-6, upper=0.05)
+        _af_scaled = 1 - (np.log10(_af_clipped) / np.log10(0.05))
+        df_impact['af_v_transformed'] = _af_scaled.clip(0.0, 1.0)
+    else:
+        df_impact['af_v_transformed'] = 0.0
+
+    # domain_flag: 1 if variant sits in a defined domain
+    if 'in_domain' in df_impact.columns:
+        df_impact['domain_flag'] = df_impact['in_domain'].fillna(False).astype(int)
+    elif 'domain_label' in df_impact.columns:
+        df_impact['domain_flag'] = df_impact['domain_label'].notna().astype(int)
+    else:
+        df_impact['domain_flag'] = 0
+
+    # splice_prox_flag: consequence mentions splice or close to exon boundary
+    def _is_splice(row):
+        cons = str(row.get('vep_consequence', '')).lower()
+        dist = row.get('intron_distance', np.nan)
+        return ('splice' in cons) or (pd.notna(dist) and dist <= 10)
+
+    if 'vep_consequence' in df_impact.columns or 'intron_distance' in df_impact.columns:
+        df_impact['splice_prox_flag'] = df_impact.apply(_is_splice, axis=1).astype(int)
+    else:
+        df_impact['splice_prox_flag'] = 0
+
+    # impact_score: hand-mixed linear score aligned to plan
+    df_impact['impact_score'] = (
+        0.6 * df_impact.get('model_score', 0) +
+        0.2 * df_impact['cons_scaled'] +
+        0.1 * df_impact['domain_flag'] +
+        0.1 * df_impact['splice_prox_flag'] -
+        0.3 * df_impact['af_v_transformed']
+    )
+    df_impact['impact_score'] = df_impact['impact_score'].clip(0.0, 1.0)
+
     return df_impact
 
 
@@ -879,9 +934,9 @@ def __(
 
             for domain in large_domains:
                 mask = df_clusters["cluster"] == domain
-                if "consequence" in df_clusters.columns:
+                if "vep_consequence" in df_clusters.columns:
                     # Create sub-clusters within large domains
-                    sub_cluster = df_clusters.loc[mask, "consequence"].fillna("other")
+                    sub_cluster = df_clusters.loc[mask, "vep_consequence"].fillna("other")
                     df_clusters.loc[mask, "cluster"] = sub_cluster.astype(str).radd(f"{domain}_")
 
             logger.info(f"Domain-based clustering: {df_clusters['cluster'].nunique()} clusters")
@@ -895,15 +950,15 @@ def __(
             logger.info(f"Consequence-based clustering: {df_clusters['cluster'].nunique()} clusters")
 
     elif clustering_widget.value == "consequence":
-        if "consequence" in df_clusters.columns:
-            df_clusters["cluster"] = df_clusters["consequence"].fillna("other")
+        if "vep_consequence" in df_clusters.columns:
+            df_clusters["cluster"] = df_clusters["vep_consequence"].fillna("other")
         else:
             df_clusters["cluster"] = "other"
         logger.info(f"Consequence-based clustering: {df_clusters['cluster'].nunique()} clusters")
 
     else:
         # Default to consequence
-        df_clusters["cluster"] = df_clusters.get("consequence", "other").fillna("other")
+        df_clusters["cluster"] = df_clusters.get("vep_consequence", "other").fillna("other")
 
     return df_clusters
 
@@ -934,18 +989,25 @@ def __(
         if "clinical_significance" in _group.columns:
             def _is_pathogenic(sig):
                 return "pathogenic" in str(sig).lower() and "benign" not in str(sig).lower()
-            _n_pathogenic = _group["clinical_significance"].apply(_is_pathogenic).sum()
+            _path_mask = _group["clinical_significance"].apply(_is_pathogenic)
+            _n_pathogenic = _path_mask.sum()
         else:
+            _path_mask = pd.Series(False, index=_group.index)
             _n_pathogenic = 0
 
         _n_total = len(_group)
         _max_score = _group.get("model_score", pd.Series([0.0])).max()
 
+        if _n_pathogenic > 0:
+            _tau = _group.loc[_path_mask, "model_score"].median()
+        else:
+            _tau = _max_score * threshold_factor.value
+
         _cluster_targets[_cluster_name] = {
             "n_variants": _n_total,
             "n_pathogenic": _n_pathogenic,
             "max_score": _max_score,
-            "tau_j": _max_score * threshold_factor.value,
+            "tau_j": _tau,
         }
 
     logger.info(f"Computed coverage targets for {len(_cluster_targets)} clusters with threshold factor {threshold_factor.value}")
@@ -962,18 +1024,21 @@ def __(mo, pd, df_clusters, threshold_factor):
         if "clinical_significance" in _group.columns:
             def _is_path(sig):
                 return "pathogenic" in str(sig).lower() and "benign" not in str(sig).lower()
-            _n_path = _group["clinical_significance"].apply(_is_path).sum()
+            _path_mask = _group["clinical_significance"].apply(_is_path)
+            _n_path = _path_mask.sum()
         else:
+            _path_mask = pd.Series(False, index=_group.index)
             _n_path = 0
 
         _n_tot = len(_group)
         _max_sc = _group.get("model_score", pd.Series([0.0])).max()
+        _tau = _group.loc[_path_mask, "model_score"].median() if _n_path > 0 else _max_sc * threshold_factor.value
 
         _cluster_targets_display[_cluster_name] = {
             "n_variants": _n_tot,
             "n_pathogenic": _n_path,
             "max_score": _max_sc,
-            "tau_j": _max_sc * threshold_factor.value,
+            "tau_j": _tau,
         }
 
     _targets_df = pd.DataFrame([
@@ -1007,7 +1072,14 @@ def __(
     _cluster_tgt_dict = {}
     for _cn, _cg in df_clusters.groupby("cluster"):
         _mx = _cg.get("model_score", pd.Series([0.0])).max()
-        _cluster_tgt_dict[_cn] = _mx * threshold_factor.value
+        if "clinical_significance" in _cg.columns:
+            def _is_path(sig):
+                return "pathogenic" in str(sig).lower() and "benign" not in str(sig).lower()
+            _mask = _cg["clinical_significance"].apply(_is_path)
+            _tau_val = _cg.loc[_mask, "model_score"].median() if _mask.sum() > 0 else _mx * threshold_factor.value
+        else:
+            _tau_val = _mx * threshold_factor.value
+        _cluster_tgt_dict[_cn] = _tau_val
 
     df_final_scored["cluster_target"] = df_final_scored["cluster"].map(
         lambda c: _cluster_tgt_dict.get(c, 0.5)
@@ -1057,6 +1129,8 @@ def __(
     """Save final scored and clustered variants."""
     _final_path = FEATURES_DIR / "variants_scored.parquet"
     df_final_scored.to_parquet(_final_path)
+    _final_csv = FEATURES_DIR / "variants_scored.csv"
+    df_final_scored.to_csv(_final_csv, index=False)
     logger.info(f"Wrote scored & clustered variants to {_final_path}")
     
     # Log clustering info

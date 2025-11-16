@@ -7,6 +7,7 @@ Steps 6-8: Run Strand optimization, map to assays, generate reports.
 Run interactively:  marimo edit notebooks/03_optimization_dashboard.py
 Run as dashboard:   marimo run notebooks/03_optimization_dashboard.py
 Run as script:      python notebooks/03_optimization_dashboard.py
+Run autonomously:   python notebooks/03_optimization_dashboard.py --auto
 """
 
 import marimo
@@ -17,7 +18,7 @@ app = marimo.App()
 
 @app.cell
 def __():
-    """Import core libraries."""
+    """Import core libraries and detect autonomous mode."""
     import marimo as mo
     import pandas as pd
     import numpy as np
@@ -30,8 +31,11 @@ def __():
     # Config is imported at module level, no need to re-import
 
     logger = logging.getLogger(__name__)
-
-    return mo, pd, np, Path, logger, json, datetime, Optional, Dict, List, Tuple, sys
+    
+    # Detect autonomous mode from command line or environment
+    AUTONOMOUS_MODE = "--auto" in sys.argv or "MARIMO_AUTONOMOUS" in __import__("os").environ
+    
+    return mo, pd, np, Path, logger, json, datetime, Optional, Dict, List, Tuple, sys, AUTONOMOUS_MODE
 
 
 @app.cell
@@ -114,81 +118,74 @@ def __(mo):
 
 
 @app.cell
-def __(mo, df_scored_optim):
+def __(mo, df_scored_optim, AUTONOMOUS_MODE):
     """Optimization parameter controls."""
     if df_scored_optim.empty:
         mo.md("No scored variants. Load data first.")
         k_optim = None
-        iters_optim = None
         strat_optim = None
-        wgt_enformer = None
-        wgt_motif = None
-        wgt_cons = None
-        wgt_dna = None
+        lambda_cov = None
     else:
         mo.md("### Optimization Parameters")
+        
+        if AUTONOMOUS_MODE:
+            # In autonomous mode, use fixed values without interactive controls
+            class _StaticControl:
+                def __init__(self, value):
+                    self.value = value
+            
+            k_value = min(30, len(df_scored_optim))
+            strat_value = "Greedy coverage"
+            lambda_value = 0.6
+            
+            k_optim = _StaticControl(k_value)
+            strat_optim = _StaticControl(strat_value)
+            lambda_cov = _StaticControl(lambda_value)
+            
+            mo.md(f"**Autonomous Mode:** Using K={k_value}, Strategy={strat_value}, λ={lambda_value}")
+        else:
+            k_optim = mo.ui.slider(
+                10, min(200, len(df_scored_optim)),
+                value=min(30, len(df_scored_optim)),
+                label="Panel Size (K)"
+            )
 
-        k_optim = mo.ui.slider(
-            10, min(200, len(df_scored_optim)),
-            value=min(30, len(df_scored_optim)),
-            label="Panel Size (K)"
-        )
+            strat_optim = mo.ui.radio(
+                options=["Greedy coverage", "Top score", "Random"],
+                value="Greedy coverage",
+                label="Strategy"
+            )
 
-        iters_optim = mo.ui.slider(
-            100, 5000,
-            value=1000,
-            step=100,
-            label="Iterations"
-        )
+            lambda_cov = mo.ui.slider(
+                0.0, 2.0, value=0.6, step=0.05, label="Coverage penalty λ"
+            )
 
-        strat_optim = mo.ui.radio(
-            options=["CEM", "GA", "Random"],
-            value="CEM",
-            label="Strategy"
-        )
-
-        mo.md("### Reward Weights")
-        wgt_enformer = mo.ui.slider(0, 1, value=0.4, step=0.05, label="Enformer Δ")
-        wgt_motif = mo.ui.slider(0, 1, value=0.3, step=0.05, label="Motif Δ")
-        wgt_cons = mo.ui.slider(0, 1, value=0.2, step=0.05, label="Conservation")
-        wgt_dna = mo.ui.slider(0, 1, value=0.1, step=0.05, label="DNA FM Δ")
-
-    return k_optim, iters_optim, strat_optim, wgt_enformer, wgt_motif, wgt_cons, wgt_dna
+    return k_optim, strat_optim, lambda_cov
 
 
 @app.cell
 def __(
     mo,
-    k_optim, iters_optim, strat_optim,
-    wgt_enformer, wgt_motif, wgt_cons, wgt_dna
+    k_optim, strat_optim, lambda_cov
 ):
-    """Display normalized weights."""
+    """Echo chosen strategy and coverage penalty."""
     if strat_optim is None:
+        mo.md("Select a strategy to proceed.")
         normalized_wgt_optim = None
     else:
-        _total = (wgt_enformer.value + wgt_motif.value + wgt_cons.value + wgt_dna.value)
-        if _total == 0:
-            _total = 1.0
-
-        normalized_wgt_optim = {
-            "enformer": wgt_enformer.value / _total,
-            "motif": wgt_motif.value / _total,
-            "conservation": wgt_cons.value / _total,
-            "dnafm": wgt_dna.value / _total,
-        }
-
-        _wgt_df = pd.DataFrame([
-            {"Component": k, "Weight": f"{v:.3f}"}
-            for k, v in normalized_wgt_optim.items()
-        ])
-        mo.md("### Normalized Weights")
-        mo.ui.table(_wgt_df)
+        mo.md(f"**Strategy:** {strat_optim.value if hasattr(strat_optim, 'value') else strat_optim}\n\n**Coverage λ:** {lambda_cov.value if lambda_cov else 0}")
+        normalized_wgt_optim = None
 
 
 @app.cell
-def __(mo):
+def __(mo, AUTONOMOUS_MODE):
     """Run optimization button."""
-    run_optim_btn = mo.ui.button(label="▶️ Run Optimization", on_click=lambda _: True)
+    if AUTONOMOUS_MODE:
+        # In autonomous mode, simulate button press automatically
+        run_optim_btn = True
+        mo.md("**Running optimization automatically...**")
+    else:
+        run_optim_btn = mo.ui.button(label="▶️ Run Optimization", on_click=lambda _: True)
     return run_optim_btn
 
 
@@ -196,7 +193,7 @@ def __(mo):
 def __(
     logger, pd, np,
     df_scored_optim,
-    k_optim, iters_optim, strat_optim, normalized_wgt_optim,
+    k_optim, strat_optim, lambda_cov,
     run_optim_btn, CAMPAIGN_ROOT
 ):
     """
@@ -210,76 +207,106 @@ def __(
         optim_results = None
     else:
         logger.info(f"Starting optimization: {strat_optim.value if strat_optim else 'Random'}")
-        runner = None
+
+        def _select_greedy(df: pd.DataFrame, k: int, lambda_penalty: float) -> pd.DataFrame:
+            df_work = df.copy()
+            score_col = 'impact_score' if 'impact_score' in df_work.columns else 'model_score'
+            if score_col not in df_work.columns:
+                raise ValueError("No impact_score or model_score available for optimization")
+
+            # Precompute tau_j from cluster_target if present
+            cluster_targets = {}
+            if 'cluster_id' in df_work.columns and 'cluster_target' in df_work.columns:
+                cluster_targets = (
+                    df_work[['cluster_id', 'cluster_target']]
+                    .dropna()
+                    .drop_duplicates('cluster_id')
+                    .set_index('cluster_id')['cluster_target']
+                    .to_dict()
+                )
+
+            selected = []
+            cov = {cid: 0.0 for cid in cluster_targets.keys()}
+
+            def _penalty(cov_dict):
+                return sum(max(0.0, cluster_targets.get(cid, 0.0) - cov_dict.get(cid, 0.0)) for cid in cluster_targets)
+
+            remaining_idx = set(df_work.index)
+            for _ in range(k):
+                best_idx = None
+                best_gain = -np.inf
+                for idx in list(remaining_idx):
+                    row = df_work.loc[idx]
+                    cid = row.get('cluster_id', None)
+                    score = float(row.get(score_col, 0.0))
+                    cov_new = cov.copy()
+                    if cid in cluster_targets:
+                        cov_new[cid] = max(cov_new.get(cid, 0.0), score)
+                    gain = score - lambda_penalty * (_penalty(cov_new) - _penalty(cov))
+                    if gain > best_gain:
+                        best_gain = gain
+                        best_idx = idx
+                if best_idx is None:
+                    break
+                remaining_idx.remove(best_idx)
+                row = df_work.loc[best_idx]
+                cid = row.get('cluster_id', None)
+                if cid in cluster_targets:
+                    cov[cid] = max(cov.get(cid, 0.0), float(row.get(score_col, 0.0)))
+                selected.append(best_idx)
+
+            df_sel = df_work.loc[selected].copy()
+            df_sel['optimization_score'] = df_sel[score_col]
+            df_sel['selected'] = True
+            df_sel['rank'] = range(1, len(df_sel) + 1)
+            return df_sel
+
         try:
-            # Try to use the Strand engine if available
-            try:
-                sys.path.insert(0, str(CAMPAIGN_ROOT))
-                from src.reward.run_abca4_optimization import OptimizationRunner
-
-                runner = OptimizationRunner()
-                logger.info("Using real Strand optimization via OptimizationRunner")
-                
-                # Build a mock feature matrix from scored variants
-                feature_matrix = df_scored_optim.copy()
-                sequences = runner.build_sequences(feature_matrix)
-                ranked = runner.compute_scores(sequences)
-                
-                # Log to MLflow
-                runner.log_mlflow(ranked, top_k=k_optim.value)
-                
-                # Select top-k
-                _df_selected = ranked.head(k_optim.value).copy()
-                _df_selected["selected"] = True
-                _df_selected["rank"] = range(1, len(_df_selected) + 1)
-
-                # Require deterministic reward scores - no random fallbacks
-                if "reward" not in _df_selected.columns:
-                    raise ValueError("Strand optimization runner did not return 'reward' column - scores would be non-deterministic")
-
-                _df_selected["optimization_score"] = _df_selected["reward"]
-                optim_mode = "strand"
-
-            except Exception as e:
-                optimization_error = f"Strand optimization engine unavailable: {e}"
-                logger.error(optimization_error)
-                optim_mode = "error"
-                _df_selected = pd.DataFrame()  # Empty result
+            if strat_optim and strat_optim.value == "Top score":
+                score_col = 'impact_score' if 'impact_score' in df_scored_optim.columns else 'model_score'
+                ranked = df_scored_optim.sort_values(score_col, ascending=False).head(k_optim.value).copy()
+                ranked['optimization_score'] = ranked[score_col]
+                ranked['selected'] = True
+                ranked['rank'] = range(1, len(ranked) + 1)
+                optim_mode = "top_score"
+                _df_selected = ranked
+            elif strat_optim and strat_optim.value == "Random":
+                sample = df_scored_optim.sample(n=min(k_optim.value, len(df_scored_optim)), random_state=42).copy()
+                score_col = 'impact_score' if 'impact_score' in sample.columns else 'model_score'
+                sample['optimization_score'] = sample[score_col]
+                sample['selected'] = True
+                sample['rank'] = range(1, len(sample) + 1)
+                optim_mode = "random"
+                _df_selected = sample
+            else:
+                _df_selected = _select_greedy(df_scored_optim, k_optim.value, lambda_cov.value if lambda_cov else 0.0)
+                optim_mode = "greedy_coverage"
 
             optim_results = {
-                "strategy": strat_optim.value if strat_optim else "Random",
+                "strategy": strat_optim.value if strat_optim else "Greedy coverage",
                 "k": k_optim.value,
-                "iterations": iters_optim.value if iters_optim else 1000,
-                "weights": normalized_wgt_optim if normalized_wgt_optim else {},
+                "coverage_lambda": lambda_cov.value if lambda_cov else 0.0,
                 "selected_variants": _df_selected,
                 "timestamp": pd.Timestamp.now(),
                 "mode": optim_mode,
-                "artifact_path": (runner.output_dir / "abca4_top_variants.json") if (locals().get('runner') and optim_mode == "strand") else None,
-                "error": locals().get('optimization_error') if optim_mode == "error" else None,
+                "artifact_path": None,
+                "error": None,
             }
 
-            # Show execution path banner
-            if optim_mode == "error":
-                error_msg = optim_results.get("error", "Unknown optimization error")
-                mo.md(f"""
-                **Optimization Error: Cannot Proceed**
-
-                {error_msg}
-
-                **Required Actions:**
-                1. Check that the Strand optimization engine is properly installed
-                2. Verify MLflow configuration
-                3. Enable DEMO_MODE_ENABLED in src/config.py for demo data
-                4. Fix the underlying issue before proceeding
-                """)
-            else:
-                mo.md("Strand optimization completed successfully.")
-
+            mo.md("Optimization completed.")
             logger.info(f"Optimization complete. Selected {len(_df_selected)} variants")
 
         except Exception as e:
             logger.error(f"Optimization failed: {e}")
-            optim_results = None
+            optim_results = {
+                "mode": "error",
+                "error": str(e),
+                "selected_variants": pd.DataFrame(),
+                "strategy": strat_optim.value if strat_optim else "Greedy coverage",
+                "k": k_optim.value,
+                "coverage_lambda": lambda_cov.value if lambda_cov else 0.0,
+                "timestamp": pd.Timestamp.now(),
+            }
 
     return optim_results
 
@@ -299,14 +326,11 @@ def __(mo, optim_results):
     else:
         mode = optim_results.get('mode', 'unknown')
         error = optim_results.get('error')
-        artifact = optim_results.get('artifact_path')
 
         if mode == "error":
             msg = f"**Optimizer mode:** `{mode}` - {error}"
         else:
-            msg = f"**Optimizer mode:** `{mode}`"
-            if artifact:
-                msg += f"\nMLflow artifact source: `{artifact}`"
+            msg = f"**Optimizer mode:** `{mode}`\n**λ (coverage):** {optim_results.get('coverage_lambda', 0)}"
         mo.md(msg)
 
 
@@ -447,7 +471,7 @@ def __(mo, df_mapped):
     if df_mapped is None or df_mapped.empty:
         mo.md("No optimization results yet.")
     else:
-        _display_cols = ["rank", "chrom", "pos", "ref", "alt", "consequence", "mechanism", "suggested_assay"]
+        _display_cols = ["rank", "chrom", "pos", "ref", "alt", "vep_consequence", "mechanism", "suggested_assay"]
         _avail_cols = [c for c in _display_cols if c in df_mapped.columns]
 
         mo.md("""
@@ -483,7 +507,7 @@ def __(
         json_export_path = REPORTS_DIR / "variants_selected.json"
         _json_data = df_mapped[[
             "rank", "chrom", "pos", "ref", "alt",
-            "consequence", "mechanism", "suggested_assay"
+            "vep_consequence", "mechanism", "suggested_assay"
         ]].to_dict(orient="records")
 
         with open(json_export_path, "w") as _f_json:
@@ -505,12 +529,24 @@ def __(mo):
 
 
 @app.cell
-def __(mo, pd):
+def __(mo, pd, AUTONOMOUS_MODE):
     """Report configuration."""
-    report_title_widget = mo.ui.text(value="ABCA4 Variant Selection Report v1", label="Title")
     _today = pd.Timestamp.now().strftime("%Y-%m-%d")
-    report_date_widget = mo.ui.text(value=_today, label="Date")
-    report_notes_widget = mo.ui.text_area(value="", label="Additional Notes")
+    
+    if AUTONOMOUS_MODE:
+        # In autonomous mode, use fixed values
+        class _StaticTextControl:
+            def __init__(self, value):
+                self.value = value
+        
+        report_title_widget = _StaticTextControl("ABCA4 Variant Selection Report v1")
+        report_date_widget = _StaticTextControl(_today)
+        report_notes_widget = _StaticTextControl("Autonomous optimization run for quality assurance verification.")
+        mo.md(f"**Report Config (Autonomous):** Title='ABCA4 Variant Selection Report v1', Date='{_today}'")
+    else:
+        report_title_widget = mo.ui.text(value="ABCA4 Variant Selection Report v1", label="Title")
+        report_date_widget = mo.ui.text(value=_today, label="Date")
+        report_notes_widget = mo.ui.text_area(value="", label="Additional Notes")
 
     return report_title_widget, report_date_widget, report_notes_widget
 
@@ -534,13 +570,23 @@ def __():
 def __(
     pd, datetime,
     df_mapped, optim_results,
-    report_title_widget, report_date_widget, report_notes_widget,
-    _build_weight_str
+    report_title_widget, report_date_widget, report_notes_widget
 ):
     """Generate Markdown report."""
     if df_mapped is None or optim_results is None:
         report_md = None
     else:
+        # Helper function to build weight string
+        def _build_weight_str_local(weights_dict):
+            if not weights_dict:
+                return "- (Feature-based ranking used)"
+            lines = []
+            for key in ['enformer', 'motif', 'conservation', 'dnafm', 'regulatory', 'splice', 'missense']:
+                if key in weights_dict:
+                    label = key.replace('dnafm', 'DNA FM')
+                    lines.append(f"- {label}: {weights_dict[key]:.3f}")
+            return "\n".join(lines) if lines else "- (Feature-based ranking used)"
+        
         _date_str = str(report_date_widget.value) if report_date_widget.value else pd.Timestamp.now().strftime("%Y-%m-%d")
 
         report_md = f"""# {report_title_widget.value}
@@ -555,11 +601,11 @@ Curated selection of ABCA4 variants for functional validation.
 
 - **Strategy:** {optim_results.get('strategy', 'Feature ranking')}
 - **Panel Size (K):** {optim_results.get('k', len(df_mapped))}
-- **Iterations:** {optim_results.get('iterations', 1)}
+- **Coverage λ:** {optim_results.get('coverage_lambda', 0)}
 
 ### Feature Weights
 
-{_build_weight_str(optim_results.get('weights', {}))}
+{_build_weight_str_local(optim_results.get('weights', {}))}
 
 ## Selected Variants ({len(df_mapped)})
 
@@ -569,7 +615,7 @@ Curated selection of ABCA4 variants for functional validation.
         for _idx, _row in df_mapped.head(50).iterrows():
             _rank = _row.get("rank", _idx)
             _variant = f"{_row.get('chrom', '?')}:{_row.get('pos', '?')}:{_row.get('ref', '?')}/{_row.get('alt', '?')}"
-            _consequence = _row.get("consequence", "?")
+            _consequence = _row.get("vep_consequence", "?")
             _mechanism = _row.get("mechanism", "?")
             _assay = _row.get("suggested_assay", "?")
             report_md += f"\n| {_rank} | {_variant} | {_consequence} | {_mechanism} | {_assay} |"
