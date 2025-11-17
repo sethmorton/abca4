@@ -1,19 +1,12 @@
 #!/usr/bin/env python3
 """Compute conservation features (phyloP/phastCons) for ABCA4 variants."""
 
-import logging
 from pathlib import Path
 from typing import Dict, List, Optional
 
 import pandas as pd
 import requests
-
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+from src.config import logger
 
 CAMPAIGN_ROOT = Path(__file__).resolve().parents[2]
 

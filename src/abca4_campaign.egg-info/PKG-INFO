@@ -14,6 +14,8 @@ Requires-Dist: biopython>=1.81
 Requires-Dist: pysam>=0.23.3
 Requires-Dist: pyensembl>=2.2
 Requires-Dist: mlflow>=2.14
+Requires-Dist: marimo[recommended]>=0.17.8
+Requires-Dist: plotly>=6.4.0
 Provides-Extra: interactive
 Requires-Dist: marimo>=0.17.8; extra == "interactive"
 Requires-Dist: plotly>=5.15.0; extra == "interactive"
@@ -46,6 +48,29 @@ campaigns/abca4/
 
 ## 🚀 Quick Start
 
+### Setup (UV Package Manager)
+
+This project uses **`uv`** for fast, isolated Python dependency management and **`marimo`** for interactive notebooks.
+
+**System Requirements:** Only `uv` is needed. All 127 Python dependencies have prebuilt wheels for Python 3.12 on macOS/Linux/Windows, so no system libraries (gcc, build tools, etc.) are required.
+
+**Why Python 3.12?** PyArrow (via MLflow) doesn't have prebuilt wheels for Python 3.14 or early 3.13 on macOS ARM64. Without prebuilt wheels, it attempts to build from source, requiring system-level Apache Arrow C++ libraries. Python 3.12 has stable precompiled wheels, so everything installs instantly.
+
+```bash
+# Install all dependencies (including optional extras for marimo & plotly)
+uv sync --all-extras
+
+# Verify all notebooks
+for nb in notebooks/*.py; do uv run marimo check "$nb"; done
+```
+
+**What gets installed:**
+- ✓ NumPy, Pandas, SciPy — data science
+- ✓ BioPython, PySAM, PyEnsembl — bioinformatics
+- ✓ MLflow, requests, PyYAML — utilities
+- ✓ Marimo, Plotly — interactive notebooks & visualization
+- ✗ No system dependencies needed
+
 ### Running Invoke Tasks
 
 Run tasks from the repo root:
@@ -63,10 +88,10 @@ invoke generate-report           # generate snapshot reports
 Edit notebooks interactively:
 
 ```bash
-marimo edit campaigns/abca4/notebooks/01_data_exploration.py
-marimo edit campaigns/abca4/notebooks/02_feature_engineering.py
-marimo edit campaigns/abca4/notebooks/03_optimization_dashboard.py
-marimo edit campaigns/abca4/notebooks/04_fasta_exploration.py
+uv run marimo edit notebooks/01_data_exploration.py
+uv run marimo edit notebooks/02_feature_engineering.py
+uv run marimo edit notebooks/03_optimization_dashboard.py
+uv run marimo edit notebooks/04_fasta_exploration.py
 ```
 
 ### Running Notebooks as Dashboards
@@ -74,8 +99,8 @@ marimo edit campaigns/abca4/notebooks/04_fasta_exploration.py
 Deploy as standalone interactive dashboards:
 
 ```bash
-marimo run campaigns/abca4/notebooks/01_data_exploration.py
-marimo run campaigns/abca4/notebooks/03_optimization_dashboard.py
+uv run marimo run notebooks/01_data_exploration.py --headless
+uv run marimo run notebooks/03_optimization_dashboard.py --headless
 ```
 
 ### Running Notebooks as Scripts
@@ -83,7 +108,7 @@ marimo run campaigns/abca4/notebooks/03_optimization_dashboard.py
 Execute notebooks as Python scripts with CLI arguments:
 
 ```bash
-python campaigns/abca4/notebooks/01_data_exploration.py
+uv run python notebooks/01_data_exploration.py
 ```
 
 ## 📊 Notebook Guide

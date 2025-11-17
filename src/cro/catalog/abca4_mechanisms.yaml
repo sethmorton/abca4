@@ -1,0 +1,48 @@
+# ABCA4 Mechanism Tagging Rules
+# Rules for mapping variant features to molecular mechanisms
+
+rules:
+  # Folding stability defects - typically missense in structured domains
+  - condition:
+      consequence: "missense"
+      domain: ["NBD1", "NBD2", "TMD"]
+    mechanism: "folding_stability"
+    rationale: "Missense variants in structured domains often disrupt protein folding and stability"
+
+  # Transport activity defects - functional impact in nucleotide binding domains
+  - condition:
+      consequence: "missense"
+      domain: ["NBD1", "NBD2"]
+      impact_score: [0.5, 1.0]  # High impact scores
+    mechanism: "transport_activity"
+    rationale: "High-impact missense variants in nucleotide-binding domains likely affect ATP hydrolysis and transport activity"
+
+  # Trafficking/localization defects - transmembrane domain variants
+  - condition:
+      consequence: "missense"
+      domain: "TMD"
+    mechanism: "trafficking_localization"
+    rationale: "Transmembrane domain variants can disrupt membrane insertion and protein trafficking"
+
+  # Splicing defects - splice region variants
+  - condition:
+      consequence: ["splice_region", "intronic_splice"]
+    mechanism: "splicing_defect"
+    rationale: "Variants in splice regions disrupt normal mRNA splicing"
+
+  # Regulatory/transcriptional defects - UTR and regulatory variants
+  - condition:
+      consequence: ["utr", "regulatory"]
+    mechanism: "regulatory_transcriptional"
+    rationale: "Variants in regulatory regions affect gene expression and transcriptional control"
+
+  # High impact nonsense/frameshift variants
+  - condition:
+      consequence: ["nonsense", "frameshift"]
+      impact_score: [0.7, 1.0]
+    mechanism: ["folding_stability", "transport_activity"]
+    rationale: "Truncating variants with high impact scores severely disrupt protein structure and function"
+
+# Default mechanism for unassigned variants
+default_mechanism: "folding_stability"
+default_rationale: "Conservative assignment based on structural impact potential"

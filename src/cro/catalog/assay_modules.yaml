@@ -1,0 +1,98 @@
+# Assay Module Catalog
+# Gene-agnostic functional assay modules for variant validation
+
+DSF_SEC:
+  name: "Differential Scanning Fluorimetry + Size Exclusion Chromatography"
+  description: "Thermal stability and oligomeric state assessment for folding defects"
+  inputs:
+    - "Purified recombinant protein"
+    - "Variant DNA constructs"
+  outputs:
+    - "Melting temperature (Tm)"
+    - "Oligomeric state distribution"
+    - "Thermal stability curves"
+  estimated_duration_weeks: 4
+  cost_category: "medium"
+  mechanism_mapping:
+    - "folding_stability"
+    - "transport_activity"
+
+FUNCTIONAL:
+  name: "General Functional Assay"
+  description: "Comprehensive functional characterization using cell-based or biochemical assays"
+  inputs:
+    - "Variant DNA constructs"
+    - "Cell lines or biochemical reagents"
+  outputs:
+    - "Activity measurements"
+    - "Kinetic parameters"
+    - "Functional validation scores"
+  estimated_duration_weeks: 6
+  cost_category: "high"
+  mechanism_mapping:
+    - "transport_activity"
+    - "folding_stability"
+
+TRAFFICKING:
+  name: "Protein Trafficking and Localization Assay"
+  description: "Assessment of protein localization, trafficking, and membrane insertion"
+  inputs:
+    - "Variant DNA constructs"
+    - "Cell lines with fluorescent tags"
+  outputs:
+    - "Subcellular localization patterns"
+    - "Trafficking efficiency metrics"
+    - "Membrane insertion scores"
+  estimated_duration_weeks: 5
+  cost_category: "medium"
+  mechanism_mapping:
+    - "trafficking_localization"
+    - "folding_stability"
+
+SPLICE_MINIGENE:
+  name: "Splice Minigene Reporter Assay"
+  description: "Assessment of splicing defects using minigene constructs"
+  inputs:
+    - "Variant DNA constructs"
+    - "Minigene vectors"
+    - "Cell lines for transfection"
+  outputs:
+    - "Splicing efficiency"
+    - "Alternative splicing patterns"
+    - "Exon inclusion/exclusion ratios"
+  estimated_duration_weeks: 4
+  cost_category: "medium"
+  mechanism_mapping:
+    - "splicing_defect"
+
+RNA_SEQ_REPORTER:
+  name: "RNA-seq Reporter Assay"
+  description: "Transcriptome-wide assessment of splicing and expression changes"
+  inputs:
+    - "Variant DNA constructs"
+    - "Cell lines or tissues"
+  outputs:
+    - "Differential expression profiles"
+    - "Alternative splicing events"
+    - "Transcript abundance measurements"
+  estimated_duration_weeks: 8
+  cost_category: "high"
+  mechanism_mapping:
+    - "splicing_defect"
+    - "regulatory_transcriptional"
+
+TRANSCRIPTIONAL_REPORTER:
+  name: "Transcriptional Reporter Assay"
+  description: "Assessment of transcriptional regulation and promoter activity"
+  inputs:
+    - "Variant DNA constructs"
+    - "Reporter gene vectors"
+    - "Cell lines"
+  outputs:
+    - "Promoter activity measurements"
+    - "Transcription factor binding"
+    - "Regulatory element function"
+  estimated_duration_weeks: 5
+  cost_category: "medium"
+  mechanism_mapping:
+    - "regulatory_transcriptional"

@@ -54,11 +54,7 @@ EngineConfig = SDKEngineConfig or LocalEngineConfig
 EngineResults = SDKEngineResults or LocalEngineResults
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
+from src.config import logger
 
 
 class FeatureRewardBlock(BaseRewardBlock):

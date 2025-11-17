@@ -16,6 +16,10 @@ Run as dashboard:   marimo run notebooks/01_data_exploration.py
 Run as script:      python notebooks/01_data_exploration.py
 """
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import marimo
 
 __generated_with = "0.17.8"
@@ -29,18 +33,15 @@ def __():
     import pandas as pd
     import numpy as np
     from pathlib import Path
-    import logging
     from typing import Optional, List, Dict, Tuple
     import json
     import sys
+    import logging
+    from src.config import DEMO_MODE_ENABLED
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s'
-    )
     logger = logging.getLogger(__name__)
 
-    return mo, pd, np, Path, logging, logger, Optional, List, Dict, Tuple, json, sys
+    return mo, pd, np, Path, logging, logger, Optional, List, Dict, Tuple, json, sys, DEMO_MODE_ENABLED
 
 
 @app.cell
@@ -72,14 +73,15 @@ def __(mo, Path):
 
 
 @app.cell
-def __(mo, Path):
+def __(mo):
     """Define campaign root paths."""
-    CAMPAIGN_ROOT = Path(__file__).resolve().parents[0]
-    DATA_RAW_DIR = CAMPAIGN_ROOT / "data_raw"
-    DATA_PROCESSED_DIR = CAMPAIGN_ROOT / "data_processed"
+    from src.config import (
+        CAMPAIGN_ROOT, DATA_RAW_DIR, DATA_PROCESSED_DIR,
+        ANNOTATIONS_DIR, FEATURES_DIR, validate_file_exists
+    )
+
+    # Additional paths specific to this notebook
     VARIANTS_DIR = DATA_PROCESSED_DIR / "variants"
-    ANNOTATIONS_DIR = DATA_PROCESSED_DIR / "annotations"
-    FEATURES_DIR = DATA_PROCESSED_DIR / "features"
 
     # Ensure directories exist
     for d in [DATA_RAW_DIR, VARIANTS_DIR, ANNOTATIONS_DIR, FEATURES_DIR]:
@@ -93,6 +95,26 @@ def __(mo, Path):
         ANNOTATIONS_DIR,
         FEATURES_DIR,
     )
+
+
+@app.cell
+def __(mo, DATA_RAW_DIR, DATA_PROCESSED_DIR):
+    """Smoke test: Validate required directories and data availability."""
+    import os
+
+    # Check directories
+    required_dirs = [DATA_RAW_DIR, DATA_PROCESSED_DIR]
+    missing_dirs = [d for d in required_dirs if not d.exists()]
+
+    if missing_dirs:
+        mo.md(f"**Error:** Missing required directories: {missing_dirs}")
+    else:
+        # Check for raw data files
+        raw_files = list(DATA_RAW_DIR.glob("**/*.vcf.gz")) + list(DATA_RAW_DIR.glob("**/*.tsv"))
+        if not raw_files:
+            mo.md("**Warning:** No raw data files found in data_raw/. This notebook may not function properly.")
+        else:
+            mo.md("✅ Environment validation passed")
 
 
 @app.cell
@@ -160,7 +182,7 @@ def __(mo):
 
 @app.cell
 def __(
-    pd, np, logger,
+    pd, np, logger, DEMO_MODE_ENABLED,
     DATA_RAW_DIR, VARIANTS_DIR,
     uploaded_file, CAMPAIGN_ROOT
 ):
@@ -199,17 +221,22 @@ def __(
 
     except Exception as e:
         logger.error(f"Failed to run variant filter: {e}")
-        logger.info("Falling back to example data")
-        # Fallback: Create example data for testing
-        df_variants_raw = pd.DataFrame({
-            "chrom": ["1"] * 10,
-            "pos": range(94400000, 94400010),
-            "ref": ["A"] * 10,
-            "alt": ["T", "G", "C"] * 3 + ["T"],
-            "clinical_significance": ["Uncertain significance"] * 10,
-            "gene_symbol": ["ABCA4"] * 10,
-        })
-        variants_source = "fallback"
+        if DEMO_MODE_ENABLED:
+            logger.info("Demo mode: Using synthetic example data")
+            # Demo: Create example data for testing
+            df_variants_raw = pd.DataFrame({
+                "chrom": ["1"] * 10,
+                "pos": range(94400000, 94400010),
+                "ref": ["A"] * 10,
+                "alt": ["T", "G", "C"] * 3 + ["T"],
+                "clinical_significance": ["Uncertain significance"] * 10,
+                "gene_symbol": ["ABCA4"] * 10,
+            })
+            variants_source = "demo"
+        else:
+            logger.error("Data loading failed. Enable DEMO_MODE_ENABLED in src/config.py for synthetic data, or check data_raw/ directory.")
+            df_variants_raw = pd.DataFrame()
+            variants_source = "error"
 
     # Load uploaded TSV if provided (append to existing data)
     if uploaded_file is not None and hasattr(uploaded_file, 'value') and uploaded_file.value:
@@ -233,6 +260,28 @@ def __(
 
 
 @app.cell
+def __(mo, pd, df_variants_raw):
+    """Display data snapshot after loading variants."""
+    if not df_variants_raw.empty:
+        mo.md("### Data Snapshot")
+
+        # Display shape
+        mo.md(f"**Dataset Shape:** {df_variants_raw.shape[0]} rows × {df_variants_raw.shape[1]} columns")
+
+        # Display column dtypes
+        schema_df = pd.DataFrame({
+            "column": df_variants_raw.columns,
+            "dtype": df_variants_raw.dtypes.astype(str)
+        })
+        mo.md("**Column Data Types:**")
+        mo.ui.table(schema_df.reset_index(drop=True), show_data_types=False)
+
+        # Display head(3)
+        mo.md("**Sample Data (first 3 rows):**")
+        mo.ui.table(df_variants_raw.head(3), show_data_types=True)
+
+
+@app.cell
 def __(mo, df_variants_raw):
     """Report how variants were loaded (cache vs pipeline)."""
     variant_source = df_variants_raw.attrs.get('source', 'unknown')
@@ -247,7 +296,7 @@ Cached parquet loads are instant. If the notebook re-ran the ClinVar pipeline yo
 def __(mo, df_variants_raw):
     """Display raw variant counts by clinical significance."""
     if df_variants_raw.empty:
-        mo.md("⚠️ No variants loaded.")
+        mo.md("No variants loaded.")
     else:
         # Find clinical significance column
         _clinsig_cols = [c for c in df_variants_raw.columns if "clin" in c.lower() or "significance" in c.lower()]
@@ -342,7 +391,7 @@ def __(mo):
 
 @app.cell
 def __(
-    pd, np, logger,
+    pd, np, logger, DEMO_MODE_ENABLED,
     df_variants_filtered, CAMPAIGN_ROOT, VARIANTS_DIR, ANNOTATIONS_DIR
 ):
     """
@@ -380,23 +429,33 @@ def __(
                 logger.info(f"Loaded {len(df_annot)} annotated variants from pipeline")
                 annotation_source = "pipeline"
             else:
-                logger.error("Annotation pipeline failed; using minimal fallback")
+                if DEMO_MODE_ENABLED:
+                    logger.warning("Annotation pipeline failed; using minimal demo annotations")
                 df_annot = df_variants_filtered.copy()
-                # Add minimal fallback columns
+                    # Add minimal demo columns
                 for col in ["transcript_id", "vep_consequence", "vep_impact", "genomic_region"]:
                     if col not in df_annot.columns:
                         df_annot[col] = None
-                annotation_source = "fallback"
+                    annotation_source = "demo"
+                else:
+                    logger.error("Annotation pipeline failed. Enable DEMO_MODE_ENABLED in src/config.py for demo data.")
+                    df_annot = pd.DataFrame()
+                    annotation_source = "error"
 
     except Exception as e:
         logger.error(f"Failed to run annotation pipeline: {e}")
-        logger.info("Using minimal fallback annotations")
+        if DEMO_MODE_ENABLED:
+            logger.info("Demo mode: Using minimal fallback annotations")
         df_annot = df_variants_filtered.copy()
-        # Add minimal fallback columns
+            # Add minimal demo columns
         for col in ["transcript_id", "vep_consequence", "vep_impact", "genomic_region"]:
             if col not in df_annot.columns:
                 df_annot[col] = None
-        annotation_source = "fallback"
+            annotation_source = "demo"
+        else:
+            logger.error("Annotation failed. Enable DEMO_MODE_ENABLED in src/config.py for demo data.")
+            df_annot = pd.DataFrame()
+            annotation_source = "error"
 
     logger.info(f"Annotation complete. Ready for feature engineering.")
     df_annot.attrs['source'] = annotation_source
@@ -490,7 +549,8 @@ def __(
     df_domains, ANNOTATIONS_DIR
 ):
     """Export annotated variants to disk."""
-    output_path_annot = ANNOTATIONS_DIR / "variants_annotated.parquet"
+    from src.config import get_annotated_variants_path
+    output_path_annot = get_annotated_variants_path()
     df_domains.to_parquet(output_path_annot)
     logger.info(f"Wrote annotated variants to {output_path_annot}")
     return output_path_annot
@@ -500,7 +560,7 @@ def __(
 def __(mo, output_path_annot):
     """Confirm export."""
     mo.md(f"""
-✅ **Annotation Complete!**
+**Annotation Complete**
 
 Saved to: `{output_path_annot}`
 

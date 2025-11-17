@@ -8,16 +8,9 @@ Uncertain significance classifications.
 
 import pandas as pd
 from pathlib import Path
-import logging
 import sys
 from typing import Optional, List
-
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+from src.config import logger
 
 CAMPAIGN_ROOT = Path(__file__).resolve().parents[2]
 
@@ -114,12 +107,16 @@ class ABCA4VariantFilter:
 
         logger.info(f"Filtered to {len(filtered_df)} variants with target clinical significance")
 
+        # Prefer VCF alleles (they have actual ref/alt), fallback to regular columns
+        filtered_df['ref_to_use'] = filtered_df['ReferenceAlleleVCF'].fillna(filtered_df['ReferenceAllele'])
+        filtered_df['alt_to_use'] = filtered_df['AlternateAlleleVCF'].fillna(filtered_df['AlternateAllele'])
+        
         # Add variant ID and clean up columns
         filtered_df['variant_id'] = (
             filtered_df['Chromosome'].astype(str) + '_' +
             filtered_df['Start'].astype(str) + '_' +
-            filtered_df['ReferenceAllele'] + '_' +
-            filtered_df['AlternateAllele']
+            filtered_df['ref_to_use'] + '_' +
+            filtered_df['alt_to_use']
         )
 
         # Select and rename columns for our analysis
@@ -128,8 +125,8 @@ class ABCA4VariantFilter:
             'Chromosome',
             'Start',
             'Stop',
-            'ReferenceAllele',
-            'AlternateAllele',
+            'ref_to_use',
+            'alt_to_use',
             'GeneSymbol',
             'ClinicalSignificance',
             'ReviewStatus',
@@ -148,8 +145,8 @@ class ABCA4VariantFilter:
             'Chromosome': 'chrom',
             'Start': 'pos',
             'Stop': 'end',
-            'ReferenceAllele': 'ref',
-            'AlternateAllele': 'alt',
+            'ref_to_use': 'ref',
+            'alt_to_use': 'alt',
             'GeneSymbol': 'gene',
             'ClinicalSignificance': 'clinical_significance',
             'ReviewStatus': 'review_status',

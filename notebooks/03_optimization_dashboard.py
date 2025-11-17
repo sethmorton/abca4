@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
-ABCA4 Campaign – Strand Optimization Dashboard & Reporting
+ABCA4 Variant Selection: Optimization Dashboard
 
-Steps 6-8: Run Strand optimization, map to assays, generate reports.
-
+Streamlined notebook using modular utilities.
 Run interactively:  marimo edit notebooks/03_optimization_dashboard.py
 Run as dashboard:   marimo run notebooks/03_optimization_dashboard.py
-Run as script:      python notebooks/03_optimization_dashboard.py
+Export to HTML:    marimo export html notebooks/03_optimization_dashboard.py -o notebooks/03_optimization_dashboard.html
 """
 
 import marimo
@@ -17,81 +16,64 @@ app = marimo.App()
 
 @app.cell
 def __():
-    """Import core libraries."""
+    """Setup path and import core libraries."""
+    import sys
+    from pathlib import Path
+    # Add project root to path (works for both notebook and exported script)
+    try:
+        _file_path = Path(__file__).resolve()
+    except NameError:
+        _file_path = Path.cwd() / "notebooks" / "03_optimization_dashboard.py"
+    _project_root = _file_path.parent.parent
+    if str(_project_root) not in sys.path:
+        sys.path.insert(0, str(_project_root))
+    
     import marimo as mo
     import pandas as pd
-    import numpy as np
-    from pathlib import Path
-    import logging
-    import json
-    import sys
-    from typing import Optional, Dict, List, Tuple
-    from datetime import datetime
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s'
-    )
-    logger = logging.getLogger(__name__)
-
-    return mo, pd, np, Path, logging, logger, json, datetime, Optional, Dict, List, Tuple, sys
+    from src.config import logger
+    from src.reward.optimization import VariantOptimizer
+    from src.features.docs import PipelineDocs
+    return mo, pd, logger, VariantOptimizer, PipelineDocs
 
 
 @app.cell
-def __(mo, Path, logger, pd):
-    """Define campaign paths."""
-    NOTEBOOKS_DIR = Path(__file__).resolve().parent
-    CAMPAIGN_ROOT = NOTEBOOKS_DIR.parent  # campaigns/abca4
-    REPO_ROOT = CAMPAIGN_ROOT.parent
-    FEATURES_DIR = CAMPAIGN_ROOT / "data_processed" / "features"
-    REPORTS_DIR = CAMPAIGN_ROOT / "data_processed" / "reports"
-    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+def __(mo, PipelineDocs):
+    """Notebook title and introduction."""
+    mo.md(PipelineDocs.get_optimization_intro())
 
-    scored_path_optim = FEATURES_DIR / "variants_scored.parquet"
-    if not scored_path_optim.exists():
-        mo.md(f"⚠️ Missing scored variants at {scored_path_optim}. Run 02_feature_engineering.py first.")
-        df_scored_optim = pd.DataFrame()
+
+@app.cell
+def __(mo, logger, pd):
+    """Load scored variants for optimization."""
+    from src.config import FEATURES_DIR
+
+    scored_path = FEATURES_DIR / "variants_scored.parquet"
+    if not scored_path.exists():
+        mo.md(f"❌ Missing variants_scored.parquet at {scored_path}")
+        df_scored_optim = None
     else:
-        df_scored_optim = pd.read_parquet(scored_path_optim)
+        df_scored_optim = pd.read_parquet(scored_path)
         logger.info(f"Loaded {len(df_scored_optim)} scored variants for optimization")
 
-    return REPO_ROOT, CAMPAIGN_ROOT, FEATURES_DIR, REPORTS_DIR, scored_path_optim, df_scored_optim
+        # Validate required columns
+        required_cols = ['model_score', 'cluster_id', 'cluster_target']
+        missing_cols = [col for col in required_cols if col not in df_scored_optim.columns]
 
+        if missing_cols:
+            mo.md(f"❌ Missing required columns: {missing_cols}")
+            df_scored_optim = None
+        else:
+            mo.md(f"✅ Loaded {len(df_scored_optim)} variants with {df_scored_optim['cluster_id'].nunique()} clusters")
 
-@app.cell
-def __(mo):
-    """
-    ## Step 6: Strand Optimization Dashboard
-
-    Configure and run Strand engine for variant selection.
-    """
-    mo.md(__doc__)
-
-
-@app.cell
-def __(mo):
-    """Plan alignment note for Steps 6‑8."""
-    mo.md("""
-### Plan Alignment
-
-- **Step 6:** This notebook’s optimization controls drive the Strand `OptimizationRunner` and record when we fall back to feature ranking.
-- **Step 7:** Mechanism/assay mapping cells turn selected variants into experimental intents.
-- **Step 8:** The report preview/export produces the short, five-minute read promised in the v1 plan.
-""")
+    return df_scored_optim
 
 
 @app.cell
 def __(mo, df_scored_optim):
     """Optimization parameter controls."""
-    if df_scored_optim.empty:
-        mo.md("⚠️ No scored variants. Load data first.")
-        k_optim = None
-        iters_optim = None
-        strat_optim = None
-        wgt_enformer = None
-        wgt_motif = None
-        wgt_cons = None
-        wgt_dna = None
+    if df_scored_optim is None or df_scored_optim.empty:
+        mo.md("No scored variants available for optimization.")
+        k_optim = strat_optim = lambda_cov = None
     else:
         mo.md("### Optimization Parameters")
 
@@ -101,484 +83,192 @@ def __(mo, df_scored_optim):
             label="Panel Size (K)"
         )
 
-        iters_optim = mo.ui.slider(
-            100, 5000,
-            value=1000,
-            step=100,
-            label="Iterations"
-        )
-
         strat_optim = mo.ui.radio(
-            options=["CEM", "GA", "Random"],
-            value="CEM",
+            options=["Greedy coverage", "Top score", "Random"],
+            value="Greedy coverage",
             label="Strategy"
         )
 
-        mo.md("### Reward Weights")
-        wgt_enformer = mo.ui.slider(0, 1, value=0.4, step=0.05, label="Enformer Δ")
-        wgt_motif = mo.ui.slider(0, 1, value=0.3, step=0.05, label="Motif Δ")
-        wgt_cons = mo.ui.slider(0, 1, value=0.2, step=0.05, label="Conservation")
-        wgt_dna = mo.ui.slider(0, 1, value=0.1, step=0.05, label="DNA FM Δ")
+        lambda_cov = mo.ui.slider(
+            0.0, 2.0, value=0.6, step=0.05, label="Coverage penalty λ"
+        )
 
-    return k_optim, iters_optim, strat_optim, wgt_enformer, wgt_motif, wgt_cons, wgt_dna
+    return k_optim, strat_optim, lambda_cov
 
 
 @app.cell
-def __(
-    mo,
-    k_optim, iters_optim, strat_optim,
-    wgt_enformer, wgt_motif, wgt_cons, wgt_dna
-):
-    """Display normalized weights."""
+def __(mo, strat_optim, lambda_cov):
+    """Display chosen strategy."""
     if strat_optim is None:
-        normalized_wgt_optim = None
+        mo.md("Select a strategy to proceed.")
     else:
-        _total = (wgt_enformer.value + wgt_motif.value + wgt_cons.value + wgt_dna.value)
-        if _total == 0:
-            _total = 1.0
-
-        normalized_wgt_optim = {
-            "enformer": wgt_enformer.value / _total,
-            "motif": wgt_motif.value / _total,
-            "conservation": wgt_cons.value / _total,
-            "dnafm": wgt_dna.value / _total,
-        }
-
-        _wgt_df = pd.DataFrame([
-            {"Component": k, "Weight": f"{v:.3f}"}
-            for k, v in normalized_wgt_optim.items()
-        ])
-        mo.md("### Normalized Weights")
-        mo.ui.table(_wgt_df)
+        mo.md(f"**Strategy:** {strat_optim.value}\n\n**Coverage λ:** {lambda_cov.value if lambda_cov else 0}")
 
 
 @app.cell
-def __(mo):
-    """Run optimization button."""
-    run_optim_btn = mo.ui.button(label="▶️ Run Optimization", on_click=lambda _: True)
-    return run_optim_btn
-
-
-@app.cell
-def __(
-    logger, pd, np,
-    df_scored_optim,
-    k_optim, iters_optim, strat_optim, normalized_wgt_optim,
-    run_optim_btn, CAMPAIGN_ROOT, REPO_ROOT
-):
-    """
-    Execute Strand optimization with real engine or feature-based ranking.
-    
-    Uses the authoritative reward stack from campaigns/abca4/src/reward/run_abca4_optimization.py
-    and logs results to MLflow.
-    """
-    if (run_optim_btn is None or not run_optim_btn or df_scored_optim.empty or 
-        k_optim is None):
+def __(mo, df_scored_optim, k_optim, strat_optim, lambda_cov, logger):
+    """Run optimization using modular utilities."""
+    if df_scored_optim is None or k_optim is None or strat_optim is None:
+        mo.md("Cannot run optimization - missing data or parameters.")
         optim_results = None
     else:
-        logger.info(f"Starting optimization: {strat_optim.value if strat_optim else 'Random'}")
-        runner = None
         try:
-            # Try to use the Strand engine if available
-            try:
-                sys.path.insert(0, str(REPO_ROOT))
-                from src.reward.run_abca4_optimization import OptimizationRunner
+            # Prepare data for optimization
+            df_opt = VariantOptimizer.prepare_optimization_data(df_scored_optim)
+            cluster_targets = df_opt[['cluster_id', 'cluster_target']].drop_duplicates().set_index('cluster_id')['cluster_target'].to_dict()
 
-                runner = OptimizationRunner()
-                logger.info("Using real Strand optimization via OptimizationRunner")
-                
-                # Build a mock feature matrix from scored variants
-                feature_matrix = df_scored_optim.copy()
-                sequences = runner.build_sequences(feature_matrix)
-                ranked = runner.compute_scores(sequences)
-                
-                # Log to MLflow
-                runner.log_mlflow(ranked, top_k=k_optim.value)
-                
-                # Select top-k
-                _df_selected = ranked.head(k_optim.value).copy()
-                _df_selected["selected"] = True
-                _df_selected["rank"] = range(1, len(_df_selected) + 1)
-                _df_selected["optimization_score"] = _df_selected.get("reward", np.random.uniform(0.5, 1.0, len(_df_selected)))
-                optim_mode = "strand"
+            # Run optimization based on strategy
+            if strat_optim.value == "Greedy coverage":
+                selected = VariantOptimizer.select_greedy(
+                    df_opt, k_optim.value, lambda_cov.value, cluster_targets
+                )
+                optim_mode = "greedy_coverage"
+            elif strat_optim.value == "Top score":
+                # For comparison, always compute top-K
+                selected = VariantOptimizer.select_greedy(df_opt, k_optim.value, 0.0, {})  # No coverage penalty
+                optim_mode = "top_score"
+            elif strat_optim.value == "Random":
+                _selected = df_opt.sample(n=k_optim.value, random_state=42).copy()
+                _selected['optimization_score'] = _selected['impact_score'] if 'impact_score' in _selected.columns else _selected['model_score']
+                _selected['selected'] = True
+                _selected['rank'] = range(1, len(_selected) + 1)
+                optim_mode = "random"
+            else:
+                mo.md(f"❌ Unsupported strategy: {strat_optim.value}")
+                optim_results = None
 
-            except Exception as e:
-                logger.warning(f"Strand engine unavailable ({e}); using feature-based ranking fallback")
-                
-                # Fallback: simple feature-based ranking
-                _df = df_scored_optim.copy()
-                if "model_score" in _df.columns:
-                    _df = _df.sort_values("model_score", ascending=False)
-                else:
-                    _df["rank_score"] = np.random.uniform(0, 1, len(_df))
-                    _df = _df.sort_values("rank_score", ascending=False)
-                
-                _df_selected = _df.head(min(k_optim.value, len(_df))).copy()
-                _df_selected["selected"] = True
-                _df_selected["rank"] = range(1, len(_df_selected) + 1)
-                _df_selected["optimization_score"] = _df_selected.get("model_score", 
-                                                                     _df_selected.get("rank_score", 
-                                                                                    np.random.uniform(0.5, 1.0, len(_df_selected))))
-                optim_mode = "feature-ranking"
+            # Always compute top-K for comparison
+            top_k_by_score = VariantOptimizer.select_greedy(df_opt, k_optim.value, 0.0, {})  # No coverage penalty
+
+            # Handle different selection strategies
+            if strat_optim.value == "Random":
+                final_selected = _selected
+            else:
+                final_selected = selected
+
+            # Compute comparison metrics
+            _comparison = VariantOptimizer.compute_comparison_metrics(final_selected, top_k_by_score)
 
             optim_results = {
-                "strategy": strat_optim.value if strat_optim else "Random",
+                "strategy": strat_optim.value,
                 "k": k_optim.value,
-                "iterations": iters_optim.value if iters_optim else 1000,
-                "weights": normalized_wgt_optim if normalized_wgt_optim else {},
-                "selected_variants": _df_selected,
-                "timestamp": pd.Timestamp.now(),
-                "mode": optim_mode,
-                "artifact_path": (runner.output_dir / "abca4_top_variants.json") if (locals().get('runner') and optim_mode == "strand") else None,
+                "coverage_lambda": lambda_cov.value if lambda_cov else 0.0,
+                "selected_variants": final_selected,
+                "top_k_by_score": top_k_by_score,
+                "comparison": _comparison,
+                "mode": optim_mode
             }
 
-            logger.info(f"Optimization complete. Selected {len(_df_selected)} variants")
+            logger.info(f"Optimization complete: {optim_mode}, selected {len(final_selected)} variants")
 
         except Exception as e:
             logger.error(f"Optimization failed: {e}")
+            mo.md(f"❌ Optimization failed: {e}")
             optim_results = None
 
     return optim_results
 
 
 @app.cell
-def __():
-    """Import plotly for visualizations."""
-    import plotly.graph_objects as go
-    return go
+def __(mo, optim_results):
+    """Display optimization results and comparison."""
+    if optim_results is None:
+        mo.md("No optimization results to display.")
+    else:
+        # Use modular template for results display
+        mo.md(PipelineDocs.get_optimization_results_template(optim_results))
 
 
 @app.cell
 def __(mo, optim_results):
-    """Summarize which optimization path ran."""
-    if optim_results is None:
-        mo.md("Optimization not run yet.")
+    """Display optimization score distribution."""
+    if optim_results is None or 'selected_variants' not in optim_results:
+        mo.md("No results to plot.")
     else:
-        mode = optim_results.get('mode', 'unknown')
-        artifact = optim_results.get('artifact_path')
-        msg = f"**Optimizer mode:** `{mode}`"
-        if artifact:
-            msg += f"\nMLflow artifact source: `{artifact}`"
-        else:
-            msg += "\n(no MLflow artifact for fallback mode)"
-        mo.md(msg)
-
-
-@app.cell
-def __(mo, go, optim_results):
-    """Display optimization summary with visualization."""
-    if optim_results is None:
-        mo.md("Run optimization to see results.")
-    else:
-        mo.md(f"""
-### Results
-
-- Strategy: {optim_results['strategy']}
-- K: {optim_results['k']}
-- Selected: {len(optim_results['selected_variants'])}
-""")
-        
-        # Plot optimization scores
         try:
-            _df_sel = optim_results['selected_variants'].sort_values("rank")
-            _fig_opt = go.Figure()
-            _fig_opt.add_trace(go.Bar(
-                x=_df_sel["rank"],
-                y=_df_sel["optimization_score"],
-                name="Score",
+            import plotly.graph_objects as go
+
+            _selected = optim_results['selected_variants']
+            fig = go.Figure()
+
+            fig.add_trace(go.Bar(
+                x=_selected["rank"],
+                y=_selected["optimization_score"],
+                name="Selected Variants",
                 marker_color="lightseagreen"
             ))
-            _fig_opt.update_layout(
+
+            fig.update_layout(
                 title="Selected Variants by Optimization Score",
                 xaxis_title="Rank",
                 yaxis_title="Score",
                 showlegend=False,
                 template="plotly_white"
             )
-            mo.ui.plotly(_fig_opt)
-        except Exception as _e:
-            mo.md(f"Plot error: {_e}")
+
+            mo.ui.plotly(fig)
+
+        except Exception as e:
+            mo.md(f"❌ Plot error: {e}")
 
 
 @app.cell
-def __(mo):
-    """
-    ## Step 7: Experimental Mapping
-
-    Map variants to assays and collect rationale.
-    """
-    mo.md(__doc__)
-
-
-@app.cell
-def __(
-    pd, optim_results, logger, CAMPAIGN_ROOT
-):
-    """
-    Map selected variants to experimental mechanisms and assays.
-    
-    Uses consequence annotations and domain information from the real
-    annotation pipeline to suggest appropriate validation assays.
-    """
-    _mech_map = {
-        "frameshift_variant": "Loss-of-Function",
-        "stop_gained": "Loss-of-Function",
-        "stop_lost": "Loss-of-Function",
-        "splice_acceptor_variant": "Splicing defect",
-        "splice_donor_variant": "Splicing defect",
-        "missense_variant": "Protein folding",
-        "inframe_deletion": "Structural disruption",
-        "inframe_insertion": "Structural disruption",
-        "synonymous_variant": "Regulatory",
-        "upstream_gene_variant": "Regulatory",
-        "downstream_gene_variant": "Regulatory",
-    }
-
-    _assay_map = {
-        "frameshift_variant": "Western blot, confocal microscopy, flow cytometry",
-        "stop_gained": "Western blot, confocal microscopy, flow cytometry",
-        "stop_lost": "Western blot, immunofluorescence",
-        "splice_acceptor_variant": "RT-qPCR, Northern blot, Western blot",
-        "splice_donor_variant": "RT-qPCR, Northern blot, Western blot",
-        "missense_variant": "Differential scanning fluorimetry (DSF), size exclusion chromatography (SEC)",
-        "inframe_deletion": "Western blot, immunoprecipitation, SEC",
-        "inframe_insertion": "Western blot, immunoprecipitation, SEC",
-        "synonymous_variant": "RNA-seq, luciferase reporter",
-        "upstream_gene_variant": "EMSA, chromatin IP, reporter assay",
-        "downstream_gene_variant": "Reporter assay, ATAC-seq",
-    }
-
-    if optim_results is None or optim_results['selected_variants'].empty:
-        df_mapped = None
+def __(mo, optim_results):
+    """Export selected variants."""
+    if optim_results is None or 'selected_variants' not in optim_results:
+        mo.md("No results to export.")
     else:
-        df_mapped = optim_results['selected_variants'].copy()
+        try:
+            from src.config import REPORTS_DIR
 
-        # Find consequence column (may have various names)
-        consequence_col = next((c for c in df_mapped.columns if 'consequence' in c.lower()), None)
-        domain_col = next((c for c in df_mapped.columns if 'domain' in c.lower()), None)
-        
-        # Assign mechanisms and assays based on consequence
-        if consequence_col:
-            df_mapped["mechanism"] = df_mapped[consequence_col].apply(
-                lambda x: _mech_map.get(str(x).lower() if pd.notna(x) else "missense_variant", "Protein misfolding")
-            )
-            df_mapped["suggested_assay"] = df_mapped[consequence_col].apply(
-                lambda x: _assay_map.get(str(x).lower() if pd.notna(x) else "missense_variant", "Functional assay")
-            )
-        else:
-            df_mapped["mechanism"] = "Protein misfolding"
-            df_mapped["suggested_assay"] = "Functional assay"
-        
-        # Enhance with domain info if available
-        if domain_col:
-            df_mapped["domain_note"] = df_mapped[domain_col].apply(
-                lambda x: f"in {x} domain" if pd.notna(x) and str(x).lower() != "unknown" else ""
-            )
-        else:
-            df_mapped["domain_note"] = ""
-        
-        # Build rationale with safe formatting
-        def _format_rationale(row):
-            mechanism = row.get('mechanism', 'Putative')
-            domain_note = row.get('domain_note') or 'variant position'
-            score_val = row.get('model_score', row.get('optimization_score'))
-            if isinstance(score_val, (int, float)) and pd.notna(score_val):
-                score_str = f"{float(score_val):.3f}"
-            else:
-                score_str = "N/A"
-            return f"{mechanism}, {domain_note}. Model score: {score_str}"
+            _selected = optim_results['selected_variants']
 
-        df_mapped["rationale"] = df_mapped.apply(_format_rationale, axis=1)
+            # Export CSV
+            csv_path = REPORTS_DIR / "variants_selected.csv"
+            _selected.to_csv(csv_path, index=False)
 
-    return _mech_map, _assay_map, df_mapped
+            # Export JSON
+            json_path = REPORTS_DIR / "variants_selected.json"
+            _selected.to_json(json_path, orient='records', indent=2)
+
+            mo.md(f"✅ **Exported {len(_selected)} variants to:**\n- {csv_path}\n- {json_path}")
+
+        except Exception as e:
+            mo.md(f"❌ Export failed: {e}")
 
 
 @app.cell
-def __(mo, df_mapped):
-    """Display selected variants table."""
-    if df_mapped is None or df_mapped.empty:
-        mo.md("No optimization results yet.")
+def __(mo, optim_results):
+    """Summary and next steps."""
+    if optim_results is None:
+        mo.md("Optimization incomplete.")
     else:
-        _display_cols = ["rank", "chrom", "pos", "ref", "alt", "consequence", "mechanism", "suggested_assay"]
-        _avail_cols = [c for c in _display_cols if c in df_mapped.columns]
+        _comparison = optim_results.get('comparison', {})
+        impact_diff = _comparison.get('impact_diff_pct', 0)
 
-        mo.md("""
-### Selected Variants for Experimental Validation
-""")
-        mo.ui.table(df_mapped[_avail_cols].head(50))
+        status = "✅ **SUCCESS**" if abs(impact_diff) <= 5 else "⚠️ **REVIEW NEEDED**"
 
+        mo.md(f"""
+## Optimization Summary
 
-@app.cell
-def __(mo):
-    """
-    ### Export Selected Variants
-    """
-    mo.md(__doc__)
+{status}
 
+**Panel Size:** {optim_results['k']} variants
+**Strategy:** {optim_results['strategy']}
+**Coverage λ:** {optim_results['coverage_lambda']}
 
-@app.cell
-def __(
-    logger, df_mapped, REPORTS_DIR
-):
-    """Export to CSV and JSON."""
-    csv_export_path = None
-    json_export_path = None
+**Impact vs Baseline:** {impact_diff:+.1f}%
 
-    if df_mapped is not None and not df_mapped.empty:
-        csv_export_path = REPORTS_DIR / "variants_selected.csv"
-        df_mapped.to_csv(csv_export_path, index=False)
-        logger.info(f"Exported CSV to {csv_export_path}")
+### Next Steps
 
-        json_export_path = REPORTS_DIR / "variants_selected.json"
-        _json_data = df_mapped[[
-            "rank", "chrom", "pos", "ref", "alt",
-            "consequence", "mechanism", "suggested_assay"
-        ]].to_dict(orient="records")
+1. **Review selected variants** in exported CSV/JSON files
+2. **Proceed to CRO planning** for experimental design
+3. **Adjust parameters** if optimization results need improvement
 
-        with open(json_export_path, "w") as _f_json:
-            json.dump(_json_data, _f_json, indent=2)
-
-        logger.info(f"Exported JSON to {json_export_path}")
-
-    return csv_export_path, json_export_path
-
-
-@app.cell
-def __(mo):
-    """
-    ## Step 8: Report Preview & Export
-
-    Generate final Markdown report.
-    """
-    mo.md(__doc__)
-
-
-@app.cell
-def __(mo, pd):
-    """Report configuration."""
-    report_title_widget = mo.ui.text(value="ABCA4 Variant Selection Report v1", label="Title")
-    _today = pd.Timestamp.now().strftime("%Y-%m-%d")
-    report_date_widget = mo.ui.text(value=_today, label="Date")
-    report_notes_widget = mo.ui.text_area(value="", label="Additional Notes")
-
-    return report_title_widget, report_date_widget, report_notes_widget
-
-
-@app.cell
-def __():
-    """Helper function for weight display."""
-    def _build_weight_str(weights_dict):
-        if not weights_dict:
-            return "- (Feature-based ranking used)"
-        lines = []
-        for key in ['enformer', 'motif', 'conservation', 'dnafm', 'regulatory', 'splice', 'missense']:
-            if key in weights_dict:
-                label = key.replace('dnafm', 'DNA FM')
-                lines.append(f"- {label}: {weights_dict[key]:.3f}")
-        return "\n".join(lines) if lines else "- (Feature-based ranking used)"
-    return _build_weight_str
-
-
-@app.cell
-def __(
-    pd, datetime,
-    df_mapped, optim_results,
-    report_title_widget, report_date_widget, report_notes_widget,
-    _build_weight_str
-):
-    """Generate Markdown report."""
-    if df_mapped is None or optim_results is None:
-        report_md = None
-    else:
-        _date_str = str(report_date_widget.value) if report_date_widget.value else pd.Timestamp.now().strftime("%Y-%m-%d")
-
-        report_md = f"""# {report_title_widget.value}
-
-**Date:** {_date_str}
-
-## Executive Summary
-
-Curated selection of ABCA4 variants for functional validation.
-
-## Selection Approach
-
-- **Strategy:** {optim_results.get('strategy', 'Feature ranking')}
-- **Panel Size (K):** {optim_results.get('k', len(df_mapped))}
-- **Iterations:** {optim_results.get('iterations', 1)}
-
-### Feature Weights
-
-{_build_weight_str(optim_results.get('weights', {}))}
-
-## Selected Variants ({len(df_mapped)})
-
-| Rank | Variant | Consequence | Mechanism | Assay |
-|------|---------|-------------|-----------|-------|
-"""
-        for _idx, _row in df_mapped.head(50).iterrows():
-            _rank = _row.get("rank", _idx)
-            _variant = f"{_row.get('chrom', '?')}:{_row.get('pos', '?')}:{_row.get('ref', '?')}/{_row.get('alt', '?')}"
-            _consequence = _row.get("consequence", "?")
-            _mechanism = _row.get("mechanism", "?")
-            _assay = _row.get("suggested_assay", "?")
-            report_md += f"\n| {_rank} | {_variant} | {_consequence} | {_mechanism} | {_assay} |"
-
-        report_md += f"""
-
-## Assay Plan
-
-Variants will be subjected to mechanism-specific functional assays for validation.
-
-## Notes
-
-{report_notes_widget.value}
-
----
-*Generated on {_date_str} using Strand framework + Marimo*
-"""
-
-    return report_md
-
-
-@app.cell
-def __(mo, report_md):
-    """Display report preview."""
-    if report_md is None:
-        mo.md("Generate optimization results first.")
-    else:
-        mo.md(report_md)
-
-
-@app.cell
-def __(
-    logger, report_md, REPORTS_DIR
-):
-    """Export report to Markdown."""
-    report_md_path = None
-
-    if report_md is not None:
-        report_md_path = REPORTS_DIR / "report_snapshot.md"
-        with open(report_md_path, "w") as _f_report:
-            _f_report.write(report_md)
-        logger.info(f"Exported report to {report_md_path}")
-
-    return report_md_path
-
-
-@app.cell
-def __(mo, csv_export_path, json_export_path, report_md_path):
-    """Confirm all exports."""
-    mo.md(f"""
-✅ **Optimization Complete!**
-
-**Exported Files:**
-- Report: {report_md_path}
-- CSV: {csv_export_path}
-- JSON: {json_export_path}
-
-Ready for downstream analysis!
+Ready for experimental planning in CRO notebook.
 """)
 
 
+# Run the app
 if __name__ == "__main__":
     app.run()

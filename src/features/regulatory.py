@@ -2,7 +2,6 @@
 """Compute regulatory feature set for ABCA4 variants."""
 
 import json
-import logging
 import math
 import re
 from pathlib import Path
@@ -11,13 +10,7 @@ from typing import Dict, Optional
 import pandas as pd
 import pysam
 from pyensembl import EnsemblRelease
-
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+from src.config import logger
 
 CAMPAIGN_ROOT = Path(__file__).resolve().parents[2]
 CANONICAL_TRANSCRIPT = "ENST00000370225"

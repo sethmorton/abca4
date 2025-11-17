@@ -1,0 +1,122 @@
+# CRO Study Plan: ABCA4 Variant Functional Validation
+
+**Generated:** {{ generation_date }}
+**Campaign:** ABCA4 Variant Triage
+**Total Variants:** {{ study_stats.total_variants }}
+**Work Packages:** {{ study_stats.total_work_packages }}
+
+---
+
+## Executive Summary
+
+This study plan outlines a comprehensive functional validation campaign for {{ study_stats.total_variants }} ABCA4 variants identified through computational prioritization. The campaign is organized into {{ study_stats.total_work_packages }} work packages spanning {{ study_stats.assay_modules_used | length }} assay modalities.
+
+### Study Overview
+- **Genes:** {{ study_stats.genes_studied | join(", ") }}
+- **Assay Modules:** {{ study_stats.assay_modules_used | join(", ") }}
+- **Estimated Samples:** {{ study_stats.estimated_total_samples | default("TBD") }}
+- **Estimated Duration:** {{ study_stats.estimated_duration_weeks | default("TBD") }} weeks
+
+---
+
+## Work Packages
+
+{% for wp in work_packages %}
+### {{ wp.wp_id }}
+
+**Objective:** {{ wp.objective }}
+
+**Assay Module:** {{ wp.assay_module }}
+**Variants:** {{ wp.variant_ids | length }}
+**Gene:** {{ wp.gene }}
+
+#### Materials Provided
+{% for material in wp.materials_provided %}
+- {{ material }}
+{% endfor %}
+
+#### Materials Needed
+{% for material in wp.materials_needed %}
+- {{ material }}
+{% endfor %}
+
+#### Experimental Design
+{% set ds = design_summaries | selectattr("wp_id", "equalto", wp.wp_id) | first %}
+- **Design Type:** {{ ds.design_type }}
+- **Technical Replicates:** {{ ds.tech_reps }}
+- **Biological Replicates:** {{ ds.bio_reps }}
+- **Factors:**
+{% for factor in ds.factors %}
+  - {{ factor.name }}: {{ factor.levels | join(", ") }}
+{% endfor %}
+- **Controls:** {{ ds.controls | join(", ") }}
+
+#### Deliverables
+{% set ds_spec = deliverable_specs | selectattr("wp_id", "equalto", wp.wp_id) | first %}
+**Primary Metrics:**
+{% for metric in ds_spec.primary_metrics %}
+- {{ metric }}
+{% endfor %}
+
+**Raw Data Returns:**
+{% for raw_return in ds_spec.raw_returns %}
+- {{ raw_return }}
+{% endfor %}
+
+**Summary Data Columns:**
+{% for column in ds_spec.summary_columns %}
+- {{ column }}
+{% endfor %}
+
+**QC Expectations:**
+{% for qc in ds_spec.qc_expectations %}
+- {{ qc }}
+{% endfor %}
+
+#### CRO Notes
+{{ wp.cro_notes }}
+
+---
+
+{% endfor %}
+
+## Data & Reporting
+
+### Data Submission Format
+All data should be submitted in the following structure:
+```
+cro_results/
+├── {wp_id}/
+│   ├── raw_data/
+│   │   └── {raw_returns}
+│   ├── processed_data/
+│   │   └── {wp_id}_summary.csv
+│   └── reports/
+│       └── {wp_id}_report.pdf
+```
+
+### Quality Control Requirements
+- All assays must include appropriate positive and negative controls
+- Replicate concordance must meet specifications in QC expectations
+- Raw data and processing pipelines must be provided
+- Any deviations from protocol must be documented
+
+### Timeline Expectations
+- Kick-off meeting within 1 week of contract execution
+- Regular progress updates bi-weekly
+- Preliminary data review at midpoint
+- Final data package within 2 weeks of study completion
+
+---
+
+## Appendix: Variant to Work Package Mapping
+
+| Variant ID | Work Packages |
+|------------|---------------|
+{% for variant_id, wps in variant_to_wp_mapping.items() %}
+| {{ variant_id }} | {% for wp in wps %}{{ wp.wp_id }} ({{ wp.assay_module }}) {% if not loop.last %}; {% endif %}{% endfor %} |
+{% endfor %}
+
+---
+
+*Generated automatically from ABCA4 variant prioritization pipeline*

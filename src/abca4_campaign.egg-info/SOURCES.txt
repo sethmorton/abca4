@@ -14,7 +14,9 @@ src/data/download_gnomad.py
 src/data/download_spliceai.py
 src/data/filter_abca4_variants.py
 src/features/__init__.py
+src/features/add_clustering.py
 src/features/assemble_features.py
+src/features/compute_domains.py
 src/features/conservation.py
 src/features/missense.py
 src/features/regulatory.py
