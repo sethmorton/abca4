@@ -226,6 +226,91 @@ def test_pipeline(c):
 
     print("✅ Tests complete!")
 
+@task
+def cro_parse(c):
+    """Parse variant report into CRO variant panel (Stage 1)"""
+    print("🔍 Parsing variant report into CRO variant panel...")
+    c.run(f"cd {CAMPAIGN_ROOT} && uv run python src/cro/parser.py")
+    print("✅ CRO variant panel parsed!")
+
+@task
+def cro_annotate(c):
+    """Annotate variants with mechanisms (Stage 2)"""
+    print("🧬 Annotating variants with molecular mechanisms...")
+    c.run(f"cd {CAMPAIGN_ROOT} && uv run python src/cro/mechanism.py")
+    print("✅ Variants annotated with mechanisms!")
+
+@task
+def cro_assign(c):
+    """Assign assay modules to variants (Stage 3)"""
+    print("🧪 Assigning assay modules to variants...")
+    c.run(f"cd {CAMPAIGN_ROOT} && uv run python src/cro/assay_mapper.py")
+    print("✅ Assay modules assigned!")
+
+@task
+def cro_workpackages(c):
+    """Generate work packages (Stage 4)"""
+    print("📦 Generating work packages...")
+    c.run(f"cd {CAMPAIGN_ROOT} && uv run python src/cro/workpackages.py")
+    print("✅ Work packages generated!")
+
+@task
+def cro_designs(c):
+    """Generate experimental designs (Stage 5)"""
+    print("📊 Generating experimental designs...")
+    c.run(f"cd {CAMPAIGN_ROOT} && uv run python src/cro/designs.py")
+    print("✅ Experimental designs generated!")
+
+@task
+def cro_deliverables(c):
+    """Generate deliverable specifications (Stage 6)"""
+    print("📋 Generating deliverable specifications...")
+    c.run(f"cd {CAMPAIGN_ROOT} && uv run python src/cro/deliverables.py")
+    print("✅ Deliverable specifications generated!")
+
+@task
+def cro_validate(c):
+    """Validate CRO pipeline outputs"""
+    print("🔍 Validating CRO pipeline...")
+    c.run(f"cd {CAMPAIGN_ROOT} && uv run python src/cro/cro_validate.py")
+    print("✅ CRO validation complete!")
+
+@task
+def cro_plan(c):
+    """Generate complete CRO study plan (Stages 1-7)"""
+    print("📄 Generating complete CRO study plan...")
+
+    # Run all stages in sequence
+    cro_parse(c)
+    cro_annotate(c)
+    cro_assign(c)
+    cro_workpackages(c)
+    cro_designs(c)
+    cro_deliverables(c)
+
+    # Run validation
+    print("🔍 Running final validation...")
+    cro_validate(c)
+
+    # Generate final study plan
+    print("🎨 Rendering final CRO study plan...")
+    c.run(f"cd {CAMPAIGN_ROOT} && uv run python src/reporting/generate_cro_plan.py")
+
+    print("🎉 CRO study plan complete!")
+    print("\n📂 Outputs available in:")
+    print("  data_processed/cro/ - All intermediate artifacts")
+    print("  data_processed/cro/validation_report.json - Validation results")
+    print("  data_processed/reports/cro_study_plan.md - Final study plan")
+
+@task
+def cro_dashboard(c):
+    """Launch CRO planning dashboard"""
+    print("🚀 Launching CRO planning dashboard...")
+    if (NOTEBOOKS / "05_cro_plan.py").exists():
+        c.run(f"cd {CAMPAIGN_ROOT} && uv run marimo run {NOTEBOOKS}/05_cro_plan.py")
+    else:
+        print("⚠️  CRO dashboard notebook missing; run 'invoke cro.plan' first")
+
 # Create collections for organization
 data_ns = Collection('data')
 data_ns.add_task(download_data, 'download')
@@ -233,6 +318,17 @@ data_ns.add_task(process_variants, 'process')
 
 features_ns = Collection('features')
 features_ns.add_task(compute_features, 'compute')
+
+cro_ns = Collection('cro')
+cro_ns.add_task(cro_parse, 'parse')
+cro_ns.add_task(cro_annotate, 'annotate')
+cro_ns.add_task(cro_assign, 'assign')
+cro_ns.add_task(cro_workpackages, 'workpackages')
+cro_ns.add_task(cro_designs, 'designs')
+cro_ns.add_task(cro_deliverables, 'deliverables')
+cro_ns.add_task(cro_validate, 'validate')
+cro_ns.add_task(cro_plan, 'plan')
+cro_ns.add_task(cro_dashboard, 'dashboard')
 
 notebook_ns = Collection('notebook')
 notebook_ns.add_task(explore_data, 'explore')
@@ -249,4 +345,5 @@ ns.add_task(clean_data)
 ns.add_task(test_pipeline)
 ns.add_collection(data_ns)
 ns.add_collection(features_ns)
+ns.add_collection(cro_ns)
 ns.add_collection(notebook_ns)

@@ -8,17 +8,28 @@ This folder contains an end-to-end rare-variant intelligence pipeline for ABCA4,
 campaigns/abca4/
 ├── notebooks/                # Interactive Marimo analysis notebooks
 │   ├── 01_data_exploration.py          - Data discovery & filtering
-│   ├── 02_feature_engineering.py       - Feature computation & tuning  
+│   ├── 02_feature_engineing.py         - Feature computation & tuning
 │   ├── 03_optimization_dashboard.py    - Results analysis & visualization
-│   └── 04_fasta_exploration.py         - Sequence analysis & motif detection
+│   ├── 04_fasta_exploration.py         - Sequence analysis & motif detection
+│   └── 05_cro_plan.py                  - CRO study plan dashboard
 ├── src/                      # Reusable pipeline modules
+│   ├── cro/                  - CRO study plan generation
+│   │   ├── parser.py          - Stage 1: Variant parsing
+│   │   ├── mechanism.py       - Stage 2: Mechanism annotation
+│   │   ├── assay_mapper.py    - Stage 3: Assay assignment
+│   │   ├── workpackages.py    - Stage 4: Work package aggregation
+│   │   ├── designs.py         - Stage 5: Experimental design
+│   │   ├── deliverables.py    - Stage 6: Deliverables specification
+│   │   ├── catalog/           - Assay modules & mechanism rules
+│   │   └── cro_types.py       - Gene-agnostic type definitions
 │   ├── data/                 - Download & preprocessing scripts
 │   ├── features/             - Feature computation (conservation, splice, etc)
 │   ├── annotation/           - Transcript & domain annotation
-│   └── reporting/            - Report generation
+│   └── reporting/            - Report generation (including CRO plans)
 ├── docs/                     # Research notes & documentation
 ├── data_raw/                 # Original data sources (git-ignored)
 ├── data_processed/           # Computed outputs (git-ignored)
+│   └── cro/                  - CRO pipeline artifacts
 ├── requirements.txt          # Campaign dependencies
 ├── tasks.py                  # Invoke task automation
 └── .marimo.toml             # Marimo configuration (light theme, uv package manager)
@@ -70,10 +81,22 @@ Run tasks from the repo root:
 
 ```bash
 invoke -l                        # list all available tasks
+
+# Data & feature pipeline
 invoke download-data             # fetch ClinVar/gnomAD/SpliceAI/AlphaMissense
 invoke run-pipeline              # execute full feature computation pipeline
 invoke run-optimization          # rank variants & log to MLflow
 invoke generate-report           # generate snapshot reports
+
+# CRO study planning
+invoke cro.plan                  # generate complete CRO study plan (all stages)
+invoke cro.parse                 # Stage 1: Parse variant report
+invoke cro.annotate              # Stage 2: Add mechanism annotations
+invoke cro.assign                # Stage 3: Assign assay modules
+invoke cro.workpackages          # Stage 4: Create work packages
+invoke cro.designs               # Stage 5: Generate experimental designs
+invoke cro.deliverables          # Stage 6: Define deliverables
+invoke cro.dashboard             # launch CRO planning dashboard
 ```
 
 ### Interactive Notebooks
@@ -85,6 +108,7 @@ uv run marimo edit notebooks/01_data_exploration.py
 uv run marimo edit notebooks/02_feature_engineering.py
 uv run marimo edit notebooks/03_optimization_dashboard.py
 uv run marimo edit notebooks/04_fasta_exploration.py
+uv run marimo edit notebooks/05_cro_plan.py           # CRO study planning
 ```
 
 ### Running Notebooks as Dashboards
@@ -94,6 +118,7 @@ Deploy as standalone interactive dashboards:
 ```bash
 uv run marimo run notebooks/01_data_exploration.py --headless
 uv run marimo run notebooks/03_optimization_dashboard.py --headless
+uv run marimo run notebooks/05_cro_plan.py --headless         # CRO planning
 ```
 
 ### Running Notebooks as Scripts
@@ -114,6 +139,7 @@ uv run python notebooks/03_optimization_dashboard.py # ~5s - Select 30 variants
 | **02_feature_engineering.py** | Feature computation & weight tuning | Compute 76 features, generate impact scores, cluster variants | ~10s |
 | **03_optimization_dashboard.py** | Results visualization & comparison | Select 30 optimal variants, generate reports & analysis | ~5s |
 | **04_fasta_exploration.py** | Sequence analysis | Find motifs, explore protein structure, sequence patterns | - |
+| **05_cro_plan.py** | CRO study planning | Review and generate experimental plans for CRO submission | - |
 
 ## ✅ Quality Verification
 
@@ -162,6 +188,140 @@ print("✅ All quality checks passed!")
 EOF
 ```
 
+## 🧪 CRO Study Plan Generation
+
+The campaign includes a complete **CRO Study Plan Pipeline** that converts variant selections into structured experimental plans ready for CRO submission. This 7-stage pipeline transforms computational results into actionable research protocols.
+
+### CRO Pipeline Overview
+
+```
+Selected Variants → Mechanism Annotation → Assay Assignment → Work Packages → Designs → Deliverables → Validation → Study Plan
+     ↓              ↓                    ↓                ↓            ↓        ↓           ↓          ↓
+   Stage 1        Stage 2              Stage 3          Stage 4      Stage 5    Stage 6      Stage 8     Stage 7
+```
+
+### Quick CRO Setup
+
+```bash
+# Generate complete CRO study plan from variant selection
+uv run invoke cro.plan
+
+# Interactive CRO planning dashboard
+uv run marimo run notebooks/05_cro_plan.py --headless
+
+# Individual CRO pipeline stages (for development/debugging)
+invoke cro.parse        # Stage 1: Parse variants
+invoke cro.annotate     # Stage 2: Add mechanisms
+invoke cro.assign       # Stage 3: Assign assays
+invoke cro.workpackages # Stage 4: Create work packages
+invoke cro.designs      # Stage 5: Generate designs
+invoke cro.deliverables # Stage 6: Define deliverables
+invoke cro.validate     # Stage 8: Run validation
+# invoke cro.plan runs stages 1-6, then validation (8), then plan generation (7)
+```
+
+### CRO Pipeline Stages
+
+#### Stage 1: Variant Parsing (`src/cro/parser.py`)
+- **Input**: `data_processed/reports/report_snapshot.md`
+- **Output**: Structured `VariantPanel` with controlled vocabularies
+- **Features**: Gene-agnostic types, consequence normalization, JSON schema validation
+
+#### Stage 2: Mechanism Annotation (`src/cro/mechanism.py`)
+- **Input**: Variant panel + ABCA4 mechanism rules (`src/cro/catalog/abca4_mechanisms.yaml`)
+- **Output**: Molecular mechanism tags (folding_stability, transport_activity, etc.)
+- **Features**: Rule-based annotation with optional LLM enhancement
+
+#### Stage 3: Assay Assignment (`src/cro/assay_mapper.py`)
+- **Input**: Mechanism annotations + assay catalog (`src/cro/catalog/assay_modules.yaml`)
+- **Output**: Assay module assignments with rationales
+- **Features**: 6 assay modules (DSF_SEC, FUNCTIONAL, TRAFFICKING, SPLICING, RNA_SEQ, REPORTER)
+
+#### Stage 4: Work Package Aggregation (`src/cro/workpackages.py`)
+- **Input**: Assay assignments
+- **Output**: Work packages grouped by gene × assay_module
+- **Features**: Automated objective generation, materials specifications
+
+#### Stage 5: Experimental Design (`src/cro/designs.py`)
+- **Input**: Work packages
+- **Output**: Experimental designs with factors, replicates, controls
+- **Features**: Design type selection, replicate optimization
+
+#### Stage 6: Deliverables Specification (`src/cro/deliverables.py`)
+- **Input**: Work packages + designs
+- **Output**: Metrics, QC expectations, data formats
+- **Features**: Assay-specific deliverables, quality control criteria
+
+#### Stage 8: Validation (`src/cro/cro_validate.py`)
+- **Input**: All previous stages
+- **Output**: Comprehensive validation report (`data_processed/cro/validation_report.json`)
+- **Features**: 13 validation checks covering coverage, structure, enum domains, and integration
+
+#### Stage 7: Study Plan Generation (`src/reporting/generate_cro_plan.py`)
+- **Input**: All previous stages
+- **Output**: Comprehensive markdown study plan (`data_processed/reports/cro_study_plan.md`)
+- **Features**: Jinja2 templating, complete CRO-ready documentation
+
+### CRO Outputs
+
+The pipeline generates a complete study package:
+
+```
+data_processed/cro/
+├── variant_panel.parquet        # Structured variant data
+├── mechanism_panel.json         # Mechanism annotations
+├── assay_assignments.json       # Assay module assignments
+├── work_packages.jsonl          # Work package definitions
+├── designs/                     # Experimental design CSVs (condition-level rows)
+│   └── *_design.csv            # tech_reps/bio_reps are multiplicative metadata
+├── design_summaries.json        # Design specifications
+├── deliverable_specs.json       # QC and deliverable specs
+├── validation_report.json       # Comprehensive validation results
+└── logs/                        # Stage execution logs
+
+data_processed/reports/
+└── cro_study_plan.md           # Complete CRO study plan
+```
+
+### CRO Dashboard (`notebooks/05_cro_plan.py`)
+
+Interactive dashboard for CRO planning with 6 tabs:
+
+1. **📊 Overview**: Campaign summary and work package statistics
+2. **🔬 Assay Assignments**: Review mechanism-to-assay mappings
+3. **📦 Work Packages**: Detailed work package specifications
+4. **🧪 Experimental Designs**: Review factors, replicates, controls
+5. **📋 Deliverables**: QC expectations and data specifications
+6. **✅ Validation**: Review validation results and error details
+7. **📄 Generate Plan**: Final study plan generation
+
+### Strict Fail Policy & Quality Standards
+
+**STRICT FAIL POLICY**: Pipeline components fail fast with actionable error messages when required inputs are missing, malformed, or insufficient. No fallbacks, no degraded modes - fix the root cause and re-run.
+
+**Quality Standards**:
+- **Type Safety**: Full TypedDict coverage, no `Any` types, strict Literal imports
+- **Controlled Vocabularies**: Enums for consequence types, domains, assay modules
+- **Comprehensive Validation**: 13 automated checks with detailed error reporting
+- **Gene Agnostic**: Assay catalog and pipeline logic work across genes
+- **Config Driven**: YAML-based rules and catalogs for easy customization
+- **Reproducible**: Fixed seeds for sampling, version-controlled templates
+- **Audit Trail**: Complete JSON schema dumps and validation reports
+
+### Extending to New Genes
+
+Add new genes by creating mechanism rules:
+
+```yaml
+# src/cro/catalog/{gene}_mechanisms.yaml
+rules:
+  - condition:
+      consequence: "missense"
+      domain: ["DOMAIN_NAME"]
+    mechanism: "folding_stability"
+    rationale: "Missense in domain disrupts structure"
+```
+
 ## 🔬 Pipeline Flow
 
 ```
@@ -207,10 +367,13 @@ curl -o data_raw/sequences/ABCA4_P78363.fasta \
 - **Self-Contained**: Notebooks work as standalone Python scripts with no external dependencies
 - **Quality Verified**: Comprehensive validation ensures data integrity and accuracy
 - **Framework Clean**: Campaign is isolated from main `strand-sdk` for reusability
+- **CRO Integration**: Complete study plan generation pipeline for experimental validation
 
 ### Technical Details
 - All scripts assume paths relative to this campaign folder
 - Data directories (`data_raw/`, `data_processed/`) contain pre-processed data
 - Notebooks are stored as pure `.py` files (Git-friendly, reactive)
-- Use `tasks.py` for reproducible pipeline automation
+- CRO pipeline uses gene-agnostic types with strict Literal vocabularies
+- Assay modules and mechanism rules are YAML-configurable for extensibility
+- Use `tasks.py` for reproducible pipeline automation (data + CRO pipelines)
 - Session state (`.marimo/`) is automatically managed and ignored

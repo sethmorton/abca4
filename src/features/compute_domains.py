@@ -25,7 +25,8 @@ CAMPAIGN_ROOT = Path(__file__).resolve().parents[2]
 # Based on: https://www.uniprot.org/uniprotkb/P78363
 ABCA4_DOMAINS = {
     'NBD1': (87, 651),        # Nucleotide binding domain 1
-    'TMD': (652, 1350),       # Transmembrane domains 1-12
+    'TMD1': (652, 1000),      # Transmembrane domains 1-6
+    'TMD2': (1001, 1350),     # Transmembrane domains 7-12
     'NBD2': (1351, 2000),     # Nucleotide binding domain 2
     'CTD': (2001, 2273),      # C-terminal domain
 }
@@ -149,19 +150,51 @@ class DomainMapper:
             logger.error(f"Failed to save: {e}")
             return False
 
+    def get_hotspot_mapping(self) -> dict:
+        """
+        Get mapping of known hotspot positions to override domain assignments.
+        Used by notebooks for mechanism-aware clustering.
+
+        Returns dict of (start_pos, end_pos): override_domain
+        """
+        # Example Stargardt hotspots - to be filled with literature-based positions
+        return {
+            # (588, 588): 'NBD1_hotspot',  # Example: p.Gly196Arg hotspot
+            # (768, 768): 'TMD1_hotspot',  # Example: p.Gly863Ala hotspot
+            # Add more based on literature review
+        }
+
+    def apply_hotspot_overrides(self, df: pd.DataFrame, hotspot_mapping: dict = None) -> pd.DataFrame:
+        """
+        Apply hotspot overrides to domain assignments.
+        Used by notebooks to override domains for known mechanism hotspots.
+        """
+        if hotspot_mapping is None:
+            hotspot_mapping = self.get_hotspot_mapping()
+
+        df_with_overrides = df.copy()
+
+        if 'pos' in df_with_overrides.columns and hotspot_mapping:
+            for (start_pos, end_pos), override_domain in hotspot_mapping.items():
+                pos_mask = (df_with_overrides['pos'] >= start_pos) & (df_with_overrides['pos'] <= end_pos)
+                df_with_overrides.loc[pos_mask, 'domain'] = override_domain
+                logger.info(f"Applied hotspot override: positions {start_pos}-{end_pos} → {override_domain}")
+
+        return df_with_overrides
+
     def run(self) -> bool:
         """Execute full domain computation pipeline."""
         logger.info("Starting domain mapper...")
-        
+
         # Load
         df = self.load_annotated_variants()
         if df is None:
             return False
-        
+
         # Compute domains
         logger.info("Computing domain assignments...")
         df = self.compute_domains(df)
-        
+
         # Save
         logger.info("Saving results...")
         return self.save_with_domains(df)
