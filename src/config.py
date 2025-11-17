@@ -7,6 +7,9 @@ from pathlib import Path
 import pandas as pd
 import logging
 from typing import Optional, Dict, Any
+import os
+import hashlib
+import subprocess
 
 # Initialize logging once when module is imported
 LOGGER_NAME = "abca4"
@@ -40,6 +43,58 @@ SCORED_VARIANTS_FILE = "variants_scored.parquet"
 
 # Demo mode settings
 DEMO_MODE_ENABLED = False  # Set to True to enable synthetic data fallbacks
+
+
+# LLM Configuration for Assay Draft Generation
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
+LLM_TEMP = float(os.getenv("LLM_TEMP", "0.2"))
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "600"))
+LLM_MAX_VARIANTS = int(os.getenv("LLM_MAX_VARIANTS", "12"))
+
+# Provenance tracking
+def get_git_sha() -> str:
+    """Get current git SHA for provenance tracking."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=CAMPAIGN_ROOT
+        )
+        return result.stdout.strip() if result.returncode == 0 else "unknown"
+    except Exception:
+        return "unknown"
+
+RUN_ID = os.getenv("RUN_ID", get_git_sha())
+
+# Validate required LLM environment variables
+def validate_llm_config():
+    """Validate LLM configuration and fail fast if required vars missing."""
+    if not GROQ_API_KEY:
+        raise ValueError(
+            "GROQ_API_KEY environment variable is required for assay draft generation.\n"
+            "Please set GROQ_API_KEY in your environment and try again."
+        )
+
+    if not (0.1 <= LLM_TEMP <= 0.5):
+        raise ValueError(f"LLM_TEMP must be between 0.1 and 0.5, got {LLM_TEMP}")
+
+    if LLM_MAX_TOKENS > 1000:
+        raise ValueError(f"LLM_MAX_TOKENS must be <= 1000 for cost control, got {LLM_MAX_TOKENS}")
+
+    if LLM_MAX_VARIANTS > 20:
+        raise ValueError(f"LLM_MAX_VARIANTS must be <= 20 for cost control, got {LLM_MAX_VARIANTS}")
+
+    logger.info(f"LLM config validated: model={LLM_MODEL}, temp={LLM_TEMP}, max_tokens={LLM_MAX_TOKENS}, max_variants={LLM_MAX_VARIANTS}")
+
+# Data contract for assay draft input
+REQUIRED_VARIANT_COLUMNS = [
+    "variant_id", "gene", "vep_consequence", "cluster_id",
+    "impact_score", "gnomad_max_af"
+]
+
+ASSAY_DRAFTS_DIR = REPORTS_DIR / "assay_drafts"
 
 
 def get_annotated_variants_path() -> Path:

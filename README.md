@@ -60,19 +60,40 @@ uv run python --c "import pandas, marimo; print('✅ Ready')"
 - ✓ Marimo, Plotly — interactive notebooks & visualization
 - ✗ No system dependencies needed
 
+### 🤖 LLM Assay Drafts Setup
+
+The pipeline includes an optional LLM-powered assay protocol generation step using Groq:
+
+**Required Environment Variable:**
+```bash
+export GROQ_API_KEY="your-groq-api-key-here"
+```
+
+**LLM Configuration (optional overrides):**
+```bash
+export LLM_MODEL="llama-3.3-70b-versatile"  # Default model
+export LLM_TEMP="0.2"                       # Temperature (0.1-0.5)
+export LLM_MAX_TOKENS="600"                 # Max tokens per call
+export LLM_MAX_VARIANTS="12"                # Max variants to process
+```
+
+**Cost Controls:** Pipeline enforces hard limits to control API costs and fails fast if limits are exceeded.
+
 ### ⚡ Ready-to-Run Pipeline
 
 **This pipeline is production-ready!** All data is pre-processed and included, so you can start analyzing immediately:
 
 ```bash
-# Run the complete analysis pipeline (takes ~20 seconds)
+# Run the complete analysis pipeline (takes ~20 seconds + LLM calls)
 uv run python notebooks/01_data_exploration.py     # Load & explore 2,116 variants
 uv run python notebooks/02_feature_engineering.py  # Compute features & scores
 uv run python notebooks/03_optimization_dashboard.py # Select 30 optimal variants
+uv run invoke reporting.drafts                     # Generate LLM assay drafts
 
 # View results
 cat data_processed/reports/report_snapshot.md      # Analysis summary
 head -10 data_processed/reports/variants_selected.csv  # Top variants
+ls data_processed/reports/assay_drafts/protocol_drafts/  # Assay protocols
 ```
 
 ### Running Invoke Tasks
@@ -86,6 +107,7 @@ invoke -l                        # list all available tasks
 invoke download-data             # fetch ClinVar/gnomAD/SpliceAI/AlphaMissense
 invoke run-pipeline              # execute full feature computation pipeline
 invoke run-optimization          # rank variants & log to MLflow
+invoke reporting.drafts          # generate LLM-powered assay drafts
 invoke generate-report           # generate snapshot reports
 
 # CRO study planning
@@ -139,7 +161,7 @@ uv run python notebooks/03_optimization_dashboard.py # ~5s - Select 30 variants
 | **02_feature_engineering.py** | Feature computation & weight tuning | Compute 76 features, generate impact scores, cluster variants | ~10s |
 | **03_optimization_dashboard.py** | Results visualization & comparison | Select 30 optimal variants, generate reports & analysis | ~5s |
 | **04_fasta_exploration.py** | Sequence analysis | Find motifs, explore protein structure, sequence patterns | - |
-| **05_cro_plan.py** | CRO study planning | Review and generate experimental plans for CRO submission | - |
+| **05_cro_plan.py** | CRO study planning | Review assay drafts + generate experimental plans for CRO submission | - |
 
 ## ✅ Quality Verification
 
@@ -150,6 +172,7 @@ This pipeline meets production quality standards. All notebooks pass comprehensi
 - ✅ **LoF correlations validated** (stop~0.95, missense~0.1, synonymous~0.04)
 - ✅ **Coverage metrics accurate** for selection quality
 - ✅ **43.8% cluster diversity** in 30-variant selection
+- ✅ **LLM assay drafts** with data contract validation and cost controls
 
 Run quality checks anytime:
 

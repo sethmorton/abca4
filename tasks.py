@@ -21,13 +21,17 @@ NOTEBOOKS = CAMPAIGN_ROOT / "notebooks"
 SRC = CAMPAIGN_ROOT / "src"
 
 
-def _run_script(c, script_path: Path, description: str, optional: bool = False):
+def _run_script(c, script_path: Path, description: str, optional: bool = False, args: list = None):
     if not script_path.exists():
         if optional:
             print(f"⚠️  Skipping {description} (missing {script_path})")
             return
         raise FileNotFoundError(f"Required script not found: {script_path}")
-    c.run(f"uv run python {script_path}")
+
+    cmd = f"uv run python {script_path}"
+    if args:
+        cmd += " " + " ".join(str(arg) for arg in args)
+    c.run(cmd)
 
 @task
 def setup_dev(c):
@@ -145,6 +149,29 @@ def run_optimization(c):
     print("✅ Optimization complete!")
 
 @task
+def assay_drafts(c):
+    """Generate LLM-powered assay drafts for selected variants"""
+    print("🤖 Generating assay drafts using LLM...")
+
+    from src.config import REPORTS_DIR
+    selected_variants = REPORTS_DIR / "variants_selected.csv"
+
+    if not selected_variants.exists():
+        print("❌ Selected variants file not found. Run optimization first.")
+        raise FileNotFoundError(f"Missing {selected_variants}")
+
+    with c.cd(str(REPO_ROOT)):
+        _run_script(
+            c,
+            SRC / "reporting" / "generate_assay_drafts.py",
+            "assay draft generator"
+            # No args needed - CLI defaults to variants_selected.csv
+        )
+
+    print("✅ Assay drafts generated!")
+    print(f"📂 Outputs: data_processed/reports/assay_drafts/")
+
+@task
 def generate_report(c):
     """Generate final reports and dashboards"""
     print("📊 Generating reports...")
@@ -166,6 +193,7 @@ def run_pipeline(c):
     annotate_variants(c)
     compute_features(c)
     run_optimization(c)
+    assay_drafts(c)
     generate_report(c)
 
     print("🎉 ABCA4 campaign complete!")
@@ -335,15 +363,19 @@ notebook_ns.add_task(explore_data, 'explore')
 notebook_ns.add_task(tune_features, 'tune')
 notebook_ns.add_task(optimize_interactive, 'optimize')
 
+reporting_ns = Collection('reporting')
+reporting_ns.add_task(generate_report, 'generate')
+reporting_ns.add_task(assay_drafts, 'drafts')
+
 # Main namespace
 ns = Collection()
 ns.add_task(setup_dev)
 ns.add_task(run_pipeline)
 ns.add_task(run_optimization)
-ns.add_task(generate_report)
 ns.add_task(clean_data)
 ns.add_task(test_pipeline)
 ns.add_collection(data_ns)
 ns.add_collection(features_ns)
+ns.add_collection(reporting_ns)
 ns.add_collection(cro_ns)
 ns.add_collection(notebook_ns)
