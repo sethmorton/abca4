@@ -115,14 +115,18 @@ uv run python -c "import pandas, marimo; print('✅ Ready')"
 
 ### 2️⃣ Run MAVE Benchmark (10 minutes)
 
-⚠️ **First Time Only:** Download the MaveDB dataset (~500MB):
+⚠️ **First Time Only:** Download the MaveDB dataset (~1.4GB):
 
 ```bash
 # Download MaveDB data (only needed once)
 mkdir -p data_raw/mave
 cd data_raw/mave
-wget https://storage.googleapis.com/mavedb-public/mavedb-dump.tar.gz
-tar -xzf mavedb-dump.tar.gz
+
+# Download from Zenodo (https://zenodo.org/records/15653325)
+wget https://zenodo.org/records/15653325/files/mavedb-dump.20250612164404.zip?download=1 -O mavedb-dump.zip
+unzip mavedb-dump.zip
+rm mavedb-dump.zip
+
 cd ../../
 ```
 
@@ -682,7 +686,8 @@ curl -o data_raw/sequences/ABCA4_P78363.fasta \
 - [ClinVar ABCA4](https://www.ncbi.nlm.nih.gov/clinvar/?term=ABCA4)
 - [UniProt ABCA4](https://www.uniprot.org/uniprotkb/P78363)
 - [Stargardt Disease Info](https://www.nei.nih.gov/learn-about-eye-health/eye-conditions-and-diseases/stargardt-disease)
-- [MaveDB](https://www.mavedb.org/) - Multiplexed Assay of Variant Effect database
+- [MaveDB Portal](https://www.mavedb.org/) - Multiplexed Assay of Variant Effect database
+- [MaveDB Data Download](https://zenodo.org/records/15653325) - All MaveDB datasets (CC0 licensed, 1.4GB)
 - [Strand Algorithm](https://github.com/your-org/strand-sdk) - Variant selection optimizer
 
 ## 📝 Development Notes
