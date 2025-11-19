@@ -1,0 +1,37 @@
+Design an assay protocol for testing the functional impact of this ABCA4 variant in vitro.
+
+## Variant Information
+- **Variant**: {{ variant_id }} ({{ protein_change }})
+- **Gene**: {{ gene }}
+- **Consequence**: {{ consequence }}
+- **Domain/Cluster**: {{ domain_cluster_id }}
+- **Mechanism**: {{ mechanism }}
+- **Impact Score**: {{ "%.3f"|format(impact_score) }}
+- **gnomAD Max AF**: {{ "%.2e"|format(gnomad_max_af) }}
+
+## Requirements
+- Use ONLY these allowed assay types: minigene, IF trafficking, WB, thermal shift, activity
+- Word count: <300 words total
+- Budget-friendly design (S/M/L effort levels)
+- Ensure safety and feasibility
+- Include appropriate controls for WT vs mutant comparison
+- Specify readout method and expected results
+
+## Output Format
+**Assay Type:** [one from allowed list]
+
+**Cell Line:** [appropriate cell line]
+
+**Construct Design:** [vector details, tags, etc.]
+
+**Readout:** [measurement method]
+
+**Controls:** [WT, mutant, negative/positive controls]
+
+**Expected WT vs Mutant:** [expected differences]
+
+**Effort:** [S/M/L]
+
+**Budget Note:** [cost considerations]
+
+**Protocol:** [brief step-by-step protocol, <200 words]

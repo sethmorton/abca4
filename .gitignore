@@ -14,8 +14,7 @@ venv/
 *.marimo
 
 # Data (large/unversioned)
-data_raw/
-data_processed/
+data_raw/                    # Raw external datasets
 
 # MLflow
 mlruns/

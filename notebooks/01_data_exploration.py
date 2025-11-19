@@ -16,10 +16,6 @@ Run as dashboard:   marimo run notebooks/01_data_exploration.py
 Run as script:      python notebooks/01_data_exploration.py
 """
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 import marimo
 
 __generated_with = "0.17.8"
@@ -28,14 +24,23 @@ app = marimo.App()
 
 @app.cell
 def __():
-    """Import core libraries."""
+    """Setup path and import core libraries."""
+    import sys
+    from pathlib import Path
+    # Add project root to path (works for both notebook and exported script)
+    try:
+        _file_path = Path(__file__).resolve()
+    except NameError:
+        _file_path = Path.cwd() / "notebooks" / "01_data_exploration.py"
+    _project_root = _file_path.parent.parent
+    if str(_project_root) not in sys.path:
+        sys.path.insert(0, str(_project_root))
+
     import marimo as mo
     import pandas as pd
     import numpy as np
-    from pathlib import Path
     from typing import Optional, List, Dict, Tuple
     import json
-    import sys
     import logging
     from src.config import DEMO_MODE_ENABLED
 
@@ -187,13 +192,13 @@ def __(
     uploaded_file, CAMPAIGN_ROOT
 ):
     """
-    Load ABCA4 variants using the authoritative filter_abca4_variants.py pipeline.
+    Load gene variants using the ClinVar filtering pipeline.
     
     This cell invokes the real data processing pipeline rather than truncating TSV
     or creating synthetic rows.
     """
     sys.path.insert(0, str(CAMPAIGN_ROOT))
-    from src.data.filter_abca4_variants import ABCA4VariantFilter
+    from src.data.filter_clinvar_variants import ClinVarVariantFilter
     
     variants_source = "unknown"
 

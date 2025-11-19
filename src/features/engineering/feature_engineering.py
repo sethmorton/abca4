@@ -114,7 +114,7 @@ Feature slice appears corrupted. Re-run computation for {slice_name}.
     def compute_impact_scores(df_scored_step3: pd.DataFrame, scoring_mode: str,
                             alpha_wgt: float = 0.4, splice_wgt: float = 0.3,
                             cons_wgt: float = 0.15, lof_wgt: float = 0.15,
-                            features_dir: Optional[Path] = None) -> pd.DataFrame:
+                            features_dir: Optional[Path] = None, config: Optional[dict] = None) -> pd.DataFrame:
         """
         Compute impact scores using hand-mix or logistic regression.
         Moved from notebook to keep it thin.
@@ -184,17 +184,25 @@ Feature slice appears corrupted. Re-run computation for {slice_name}.
             df_impact['cons_scaled'] = 0.0
 
         # af_penalty: monotonic positive penalty for common variants
+        # In MAVE mode, gnomAD AF may not be available, so set penalty to 0
+        use_af_penalty = True
+        if config:
+            use_af_penalty = config.get('features', {}).get('use_gnomad_af', True)
+        
         af_col = next((c for c in [
             'gnomad_af_exome', 'gnomad_af_genome', 'gnomad_max_af', 'faf95_max'
         ] if c in df_impact.columns), None)
 
-        if af_col:
+        if af_col and use_af_penalty:
             af_raw = df_impact[af_col].fillna(0.0)
             af_clipped = af_raw.clip(lower=1e-6, upper=0.05)
             af_penalty = np.clip(-np.log10(af_clipped) / 6, 0, 1)
             df_impact['af_penalty'] = af_penalty
+            logger.info("Computing AF penalty from gnomAD data")
         else:
             df_impact['af_penalty'] = 0.0
+            if not use_af_penalty:
+                logger.info("Skipping AF penalty (use_gnomad_af=False in config)")
 
         # domain_flag: 1 if variant sits in a defined domain
         if 'domain' in df_impact.columns:
@@ -218,14 +226,29 @@ Feature slice appears corrupted. Re-run computation for {slice_name}.
             df_impact['splice_prox_flag'] = 0
 
         # impact_score: hand-mixed linear score aligned to plan
+        # Use config weights if provided, otherwise use defaults
+        scoring_weights = {}
+        if config:
+            scoring_weights = config.get('scoring_weights', {})
+        
+        # Apply config weights with sensible defaults
+        w_model = scoring_weights.get('model_score', 0.6)
+        w_cons = scoring_weights.get('cons_scaled', 0.2)
+        w_domain = scoring_weights.get('domain_flag', 0.1)
+        w_splice = scoring_weights.get('splice_prox_flag', 0.1)
+        w_af = scoring_weights.get('af_penalty', 0.3)
+        
         df_impact['impact_score'] = (
-            0.6 * df_impact.get('model_score', 0) +
-            0.2 * df_impact['cons_scaled'] +
-            0.1 * df_impact['domain_flag'] +
-            0.1 * df_impact['splice_prox_flag'] -
-            0.3 * df_impact['af_penalty']
+            w_model * df_impact.get('model_score', 0) +
+            w_cons * df_impact['cons_scaled'] +
+            w_domain * df_impact['domain_flag'] +
+            w_splice * df_impact['splice_prox_flag'] -
+            w_af * df_impact['af_penalty']
         )
         df_impact['impact_score'] = df_impact['impact_score'].clip(0.0, 1.0)
+        
+        # Log the weights used for reproducibility
+        logger.info(f"Impact score computation weights: model={w_model}, cons={w_cons}, domain={w_domain}, splice={w_splice}, af_penalty={w_af}")
 
         if scoring_error:
             df_impact.attrs['scoring_error'] = scoring_error

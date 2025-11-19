@@ -1,58 +1,76 @@
 #!/usr/bin/env python3
 """
-Compute protein domain assignments for ABCA4 variants.
+Compute protein domain assignments for variants.
 
-Uses UniProt domain coordinates to map coding variants to their domains:
-- NBD1: Nucleotide binding domain 1 (87-651 aa)
-- TMD: Transmembrane domains 1-12 (652-1350 aa)
-- NBD2: Nucleotide binding domain 2 (1351-2000 aa)
-- CTD: C-terminal domain (2001-2273 aa)
-
+Uses UniProt domain coordinates (provided via config) to map coding variants to their domains.
 For non-coding variants, uses consequence as fallback (e.g., "intronic", "utr").
+
+Domain configuration is gene-specific and loaded from config at runtime.
 """
 
 import re
 import sys
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 
 import pandas as pd
 from src.config import logger
+from src.config import load_gene_config
 
 CAMPAIGN_ROOT = Path(__file__).resolve().parents[2]
 
-# ABCA4 domain coordinates (from UniProt P78363)
-# Based on: https://www.uniprot.org/uniprotkb/P78363
-ABCA4_DOMAINS = {
-    'NBD1': (87, 651),        # Nucleotide binding domain 1
-    'TMD1': (652, 1000),      # Transmembrane domains 1-6
-    'TMD2': (1001, 1350),     # Transmembrane domains 7-12
-    'NBD2': (1351, 2000),     # Nucleotide binding domain 2
-    'CTD': (2001, 2273),      # C-terminal domain
-}
-
 
 class DomainMapper:
-    """Map variants to ABCA4 protein domains."""
+    """
+    Map variants to protein domains based on gene configuration.
+    
+    This class is gene-agnostic. Domain boundaries and boost factors are loaded
+    from gene-specific config at initialization. If domains are not defined in
+    config, the mapper falls back to consequence-based domain assignment.
+    """
 
-    def __init__(self, features_dir: Optional[Path] = None):
+    def __init__(self, gene_name: str, features_dir: Optional[Path] = None, config: Optional[Dict] = None):
+        """
+        Initialize domain mapper.
+        
+        Args:
+            gene_name: Gene symbol (e.g., "ABCA4") - REQUIRED, no default
+            features_dir: Directory to save outputs
+            config: Optional pre-loaded gene config. If not provided, loads from config file.
+        
+        Raises:
+            ValueError: If gene_name is empty or domains not defined in config
+        """
+        if not gene_name or not isinstance(gene_name, str) or gene_name.strip() == "":
+            raise ValueError("gene_name is required and must be a non-empty string")
+        
+        self.gene_name = gene_name
+        self.config = config or load_gene_config(gene_name)
+        self.domains = self.config.get("domains", {})
+        
+        if not self.domains:
+            raise ValueError(
+                f"No domains defined in config for {gene_name}. "
+                f"Domain assignment requires domain boundaries in config/abca4.yaml"
+            )
+        
         processed_root = CAMPAIGN_ROOT / "data_processed"
         self.features_dir = features_dir or (processed_root / "features")
         self.features_dir.mkdir(parents=True, exist_ok=True)
 
     def load_annotated_variants(self) -> Optional[pd.DataFrame]:
-        """Load annotated variants."""
-        annotated_path = CAMPAIGN_ROOT / "data_processed" / "annotations" / "abca4_vus_annotated.parquet"
+        """Load annotated variants using config path."""
+        annotated_path = CAMPAIGN_ROOT / self.config.get("output_paths", {}).get("annotated_variants", f"data_processed/annotations/{self.gene_name.lower()}_vus_annotated.parquet")
         if not annotated_path.exists():
             logger.error(f"Missing annotated variants at {annotated_path}")
             return None
         
         try:
             df = pd.read_parquet(annotated_path)
-            logger.info(f"Loaded {len(df)} annotated variants")
+            logger.info(f"Loaded {len(df)} annotated variants for {self.gene_name}")
             return df
         except Exception as e:
-            logger.error(f"Failed to load annotated variants: {e}")
+            logger.error(f"Failed to load annotated variants for {self.gene_name}: {e}")
             return None
 
     def extract_protein_position(self, protein_change_str: str) -> Optional[int]:
@@ -78,12 +96,12 @@ class DomainMapper:
         return None
 
     def position_to_domain(self, protein_position: int) -> str:
-        """Map protein position to ABCA4 domain."""
-        for domain_name, (start, end) in ABCA4_DOMAINS.items():
+        """Map protein position to domain based on config."""
+        for domain_name, (start, end) in self.domains.items():
             if start <= protein_position <= end:
                 return domain_name
         
-        # Out of bounds (rare, shouldn't happen with valid ABCA4 variants)
+        # Out of bounds (rare, shouldn't happen with valid variants)
         return "other"
 
     def consequence_to_fallback_domain(self, consequence_str: str) -> str:
@@ -140,7 +158,8 @@ class DomainMapper:
 
     def save_with_domains(self, df: pd.DataFrame) -> bool:
         """Save variants with domain annotations."""
-        output_path = self.features_dir / "variants_with_domains.parquet"
+        file_prefix = self.config.get("file_prefix", self.gene_name.lower())
+        output_path = self.features_dir / f"{file_prefix}_variants_with_domains.parquet"
         
         try:
             df.to_parquet(output_path, index=False)

@@ -32,8 +32,8 @@ def __():
     import pandas as pd
     import numpy as np
     from src.config import logger, CAMPAIGN_ROOT, FEATURES_DIR
-    from src.features.feature_engineering import FeatureEngineeringUtils
-    from src.features.docs import PipelineDocs
+    from src.features.engineering.feature_engineering import FeatureEngineeringUtils
+    from src.features.engineering.docs import PipelineDocs
     return mo, pd, np, Path, logger, CAMPAIGN_ROOT, FEATURES_DIR, FeatureEngineeringUtils, PipelineDocs
 
 
@@ -239,10 +239,10 @@ def __(mo, df_impact, logger, FEATURES_DIR, PipelineDocs):
         mo.md("Cannot perform clustering without impact scores.")
     else:
         try:
-            from src.features.add_clustering import ClusteringProcessor
+            from src.features.assembly.clustering import ClusteringProcessor
 
             # Apply domain boost and clustering
-            processor = ClusteringProcessor()
+            processor = ClusteringProcessor(gene_name="ABCA4")
 
             # Apply domain boost
             df_boosted = processor.apply_domain_boost(df_impact)

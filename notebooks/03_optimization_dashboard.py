@@ -32,7 +32,7 @@ def __():
     import pandas as pd
     from src.config import logger
     from src.reward.optimization import VariantOptimizer
-    from src.features.docs import PipelineDocs
+    from src.features.engineering.docs import PipelineDocs
     return mo, pd, logger, VariantOptimizer, PipelineDocs
 
 
@@ -262,10 +262,11 @@ def __(mo, optim_results):
 ### Next Steps
 
 1. **Review selected variants** in exported CSV/JSON files
-2. **Proceed to CRO planning** for experimental design
-3. **Adjust parameters** if optimization results need improvement
+2. **Generate assay drafts** using `invoke reporting.drafts` or `invoke run-pipeline`
+3. **Proceed to CRO planning** for experimental design (includes LLM-generated assay drafts)
+4. **Adjust parameters** if optimization results need improvement
 
-Ready for experimental planning in CRO notebook.
+**Assay Drafts Output:** `data_processed/reports/assay_drafts/`
 """)
 
 

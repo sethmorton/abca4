@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ABCA4 Variant Selection Campaign</title>
+    <style>
+        :root {
+            /* Modern, clean color palette */
+            --primary: #2D5A3D;
+            --secondary: #1F3F56;
+            --accent: #D4A574;
+            --accent-light: #E8C4A0;
+            --bg-dark: #0A0A0A;
+            --bg-light: #F9F8F5;
+            --text-primary: #1A1A1A;
+            --text-secondary: #555555;
+            --border-light: #E5E5E5;
+            --border-medium: #D5D5D5;
+            
+            /* Spacing system */
+            --sp-xs: 4px;
+            --sp-sm: 8px;
+            --sp-md: 16px;
+            --sp-lg: 24px;
+            --sp-xl: 32px;
+            --sp-2xl: 48px;
+            
+            /* Typography */
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Roboto", sans-serif;
+            --font-mono: "Monaco", "Courier New", monospace;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            background-color: var(--bg-light);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+        }
+
+        body {
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* ===== HEADER & HERO ===== */
+        .header {
+            background: linear-gradient(135deg, var(--bg-light) 0%, #F5F3F0 100%);
+            border-bottom: 1px solid var(--border-light);
+            padding: var(--sp-2xl) 0;
+            margin-bottom: var(--sp-2xl);
+        }
+
+        .header__content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 var(--sp-lg);
+        }
+
+        .header__nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--sp-xl);
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .header__logo {
+            font-weight: 700;
+            color: var(--primary);
+            font-size: 14px;
+            letter-spacing: 1.5px;
+        }
+
+        .header__meta {
+            display: flex;
+            gap: var(--sp-xl);
+        }
+
+        h1 {
+            font-size: 48px;
+            font-weight: 700;
+            line-height: 1.2;
+            color: var(--text-primary);
+            margin-bottom: var(--sp-md);
+            letter-spacing: -0.5px;
+        }
+
+        .header__subtitle {
+            font-size: 17px;
+            color: var(--text-secondary);
+            line-height: 1.7;
+            max-width: 700px;
+            margin-bottom: var(--sp-lg);
+            font-style: italic;
+        }
+
+        .header__meta-line {
+            display: flex;
+            gap: var(--sp-lg);
+            font-size: 13px;
+            color: var(--text-secondary);
+            flex-wrap: wrap;
+        }
+
+        .header__meta-line strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        /* ===== MAIN LAYOUT ===== */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 var(--sp-lg);
+        }
+
+        .content {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            padding: var(--sp-2xl);
+            margin-bottom: var(--sp-2xl);
+        }
+
+        /* ===== SECTIONS & HEADINGS ===== */
+        section {
+            margin-bottom: var(--sp-2xl);
+        }
+
+        h2 {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: var(--sp-lg);
+            margin-top: var(--sp-2xl);
+            letter-spacing: -0.3px;
+            padding-bottom: var(--sp-md);
+            border-bottom: 2px solid var(--primary);
+        }
+
+        h3 {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-top: var(--sp-xl);
+            margin-bottom: var(--sp-md);
+            letter-spacing: -0.2px;
+        }
+
+        h4 {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-top: var(--sp-lg);
+            margin-bottom: var(--sp-sm);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* ===== TEXT & EMPHASIS ===== */
+        p {
+            margin-bottom: var(--sp-md);
+            color: var(--text-primary);
+            font-size: 15px;
+            line-height: 1.75;
+        }
+
+        p + p {
+            margin-top: var(--sp-md);
+        }
+
+        strong {
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        em {
+            font-style: italic;
+            color: var(--text-secondary);
+        }
+
+        a {
+            color: var(--primary);
+            text-decoration: none;
+            border-bottom: 1px dotted var(--accent);
+            transition: color 0.2s, border-color 0.2s;
+        }
+
+        a:hover {
+            color: var(--secondary);
+            border-bottom-color: var(--secondary);
+        }
+
+        /* ===== BLOCKQUOTE ===== */
+        blockquote {
+            margin: var(--sp-lg) 0;
+            padding: var(--sp-md) 0 var(--sp-md) var(--sp-lg);
+            border-left: 4px solid var(--primary);
+            background: rgba(45, 90, 61, 0.03);
+            color: var(--text-secondary);
+            font-style: italic;
+            font-size: 15px;
+            line-height: 1.7;
+        }
+
+        blockquote p {
+            margin: 0;
+        }
+
+        /* ===== LISTS ===== */
+        ul, ol {
+            margin: var(--sp-md) 0 var(--sp-md) var(--sp-lg);
+        }
+
+        li {
+            margin-bottom: var(--sp-md);
+            line-height: 1.75;
+        }
+
+        li p {
+            margin: var(--sp-sm) 0;
+        }
+
+        /* ===== HIGHLIGHTS & CALLOUTS ===== */
+        .highlight {
+            background: linear-gradient(to right, rgba(212, 165, 116, 0.1), transparent);
+            padding: var(--sp-lg);
+            border-left: 3px solid var(--accent);
+            margin: var(--sp-lg) 0;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .callout {
+            background: rgba(45, 90, 61, 0.05);
+            padding: var(--sp-lg);
+            border-radius: 6px;
+            margin: var(--sp-lg) 0;
+            border-left: 4px solid var(--primary);
+        }
+
+        .callout strong {
+            display: block;
+            margin-bottom: var(--sp-sm);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* ===== TABLES ===== */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: var(--sp-lg) 0;
+            font-size: 14px;
+        }
+
+        th {
+            background: rgba(45, 90, 61, 0.08);
+            color: var(--primary);
+            font-weight: 700;
+            text-align: left;
+            padding: var(--sp-md);
+            border-bottom: 2px solid var(--primary);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        td {
+            padding: var(--sp-md);
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        tr:hover {
+            background: rgba(45, 90, 61, 0.02);
+        }
+
+        /* ===== FIGURES & IMAGES ===== */
+        figure {
+            margin: var(--sp-2xl) 0;
+            padding: var(--sp-lg);
+            background: var(--bg-light);
+            border-radius: 8px;
+            border: 1px solid var(--border-light);
+        }
+
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto var(--sp-md);
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        figcaption {
+            font-size: 14px;
+            color: var(--text-secondary);
+            text-align: left;
+            line-height: 1.65;
+            margin-top: var(--sp-md);
+            font-style: italic;
+        }
+
+        /* ===== STATS GRID ===== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--sp-lg);
+            margin: var(--sp-xl) 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, rgba(45, 90, 61, 0.04), rgba(31, 63, 86, 0.04));
+            border: 1px solid var(--border-light);
+            padding: var(--sp-lg);
+            border-radius: 6px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(45, 90, 61, 0.1);
+        }
+
+        .stat-card__value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--primary);
+            line-height: 1;
+            margin-bottom: var(--sp-sm);
+        }
+
+        .stat-card__label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+            line-height: 1.5;
+        }
+
+        /* ===== WORK PACKAGES ===== */
+        .wp-list {
+            display: grid;
+            gap: var(--sp-lg);
+            margin: var(--sp-lg) 0;
+        }
+
+        .wp-card {
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            padding: var(--sp-lg);
+            transition: all 0.3s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: var(--sp-lg);
+        }
+
+        .wp-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(45, 90, 61, 0.1);
+        }
+
+        .wp-card__content {
+            flex: 1;
+        }
+
+        .wp-card__title {
+            font-weight: 700;
+            color: var(--primary);
+            font-size: 16px;
+            margin-bottom: var(--sp-sm);
+        }
+
+        .wp-card__description {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: var(--sp-md);
+            line-height: 1.65;
+        }
+
+        .wp-card__badge {
+            background: var(--primary);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        /* ===== CODE & PRE ===== */
+        pre {
+            background: #F5F5F5;
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            padding: var(--sp-lg);
+            overflow-x: auto;
+            margin: var(--sp-lg) 0;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        code {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            background: #F5F5F5;
+            padding: 2px 4px;
+            border-radius: 2px;
+            color: #C41E3A;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: #333;
+        }
+
+        /* ===== FOOTER ===== */
+        footer {
+            border-top: 1px solid var(--border-light);
+            padding: var(--sp-2xl) var(--sp-md);
+            margin-top: var(--sp-2xl);
+            background: linear-gradient(to bottom, var(--bg-light), #F0EEEA);
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        footer p {
+            margin-bottom: var(--sp-sm);
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            :root {
+                --sp-2xl: 32px;
+                --sp-xl: 24px;
+            }
+
+            h1 {
+                font-size: 36px;
+            }
+
+            h2 {
+                font-size: 26px;
+            }
+
+            h3 {
+                font-size: 20px;
+            }
+
+            .header {
+                padding: var(--sp-lg) 0;
+                margin-bottom: var(--sp-lg);
+            }
+
+            .header__nav {
+                margin-bottom: var(--sp-lg);
+            }
+
+            .content {
+                padding: var(--sp-lg);
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header__meta-line {
+                flex-direction: column;
+                gap: var(--sp-sm);
+            }
+
+            .wp-card {
+                flex-direction: column;
+            }
+
+            .wp-card__badge {
+                align-self: flex-start;
+            }
+        }
+
+        /* ===== PRINT (Playwright & PDF-optimized) ===== */
+        @media print {
+            /* Page setup for A4 paper with proper margins */
+            @page {
+                size: A4;
+                margin: 15mm 18mm 18mm 18mm;
+            }
+
+            /* Reset base styling for print */
+            html, body {
+                background: #ffffff !important;
+                color: #000000;
+                font-size: 11pt;
+                line-height: 1.5;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            * {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            /* ===== HEADER STYLING ===== */
+            .header {
+                background: #ffffff !important;
+                border-bottom: 1px solid #cccccc;
+                box-shadow: none;
+                padding: 8mm 0 4mm 0;
+                margin-bottom: 8mm;
+                page-break-after: avoid;
+            }
+
+            .header__nav {
+                display: none;
+            }
+
+            .header__content,
+            .container {
+                max-width: 100% !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+
+            /* ===== TYPOGRAPHY FOR PRINT ===== */
+            h1 {
+                font-size: 22pt;
+                font-weight: 700;
+                margin: 0 0 3mm 0;
+                padding-bottom: 2mm;
+                border-bottom: 1.5pt solid var(--primary);
+                page-break-after: avoid;
+                color: #000000;
+                line-height: 1.3;
+            }
+
+            h2 {
+                font-size: 16pt;
+                font-weight: 700;
+                color: #000000;
+                margin: 8mm 0 3mm 0;
+                padding-bottom: 2mm;
+                border-bottom: 1pt solid #999999;
+                page-break-after: avoid;
+                page-break-inside: avoid;
+                line-height: 1.3;
+            }
+
+            h3 {
+                font-size: 13pt;
+                font-weight: 700;
+                color: #000000;
+                margin: 5mm 0 2mm 0;
+                page-break-after: avoid;
+                line-height: 1.3;
+            }
+
+            h4 {
+                font-size: 11pt;
+                font-weight: 700;
+                color: #000000;
+                margin: 3mm 0 2mm 0;
+                page-break-after: avoid;
+                text-transform: none;
+            }
+
+            /* ===== TEXT ELEMENTS ===== */
+            p {
+                font-size: 11pt;
+                line-height: 1.5;
+                margin: 0 0 8pt 0;
+                color: #000000;
+            }
+
+            p + p {
+                margin-top: 0;
+            }
+
+            .header__subtitle {
+                font-size: 12pt;
+                color: #000000;
+                font-style: italic;
+                margin-bottom: 3mm;
+                line-height: 1.5;
+            }
+
+            .header__meta-line {
+                font-size: 10pt;
+                color: #000000;
+                margin-bottom: 0;
+                display: flex;
+                gap: 8mm;
+                flex-wrap: wrap;
+            }
+
+            .header__meta-line strong {
+                color: #000000;
+                font-weight: 600;
+            }
+
+            /* ===== LINKS ===== */
+            a {
+                color: #000000;
+                text-decoration: none;
+                border: none;
+            }
+
+            a[href] {
+                color: #000000;
+            }
+
+            /* ===== LISTS ===== */
+            ul, ol {
+                margin: 6pt 0 8pt 20pt;
+                padding-left: 0;
+            }
+
+            li {
+                font-size: 11pt;
+                margin: 3pt 0;
+                line-height: 1.5;
+                padding-left: 0;
+            }
+
+            /* ===== CONTENT SECTIONS ===== */
+            .content {
+                background: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                padding: 0 !important;
+                margin: 0 0 10mm 0;
+                page-break-inside: avoid;
+            }
+
+            section {
+                margin-bottom: 8mm;
+                page-break-inside: avoid;
+            }
+
+            /* ===== CALLOUTS & HIGHLIGHTS ===== */
+            .callout,
+            .highlight {
+                background: #f5f5f5 !important;
+                border-left: 2pt solid var(--primary);
+                border-radius: 0;
+                box-shadow: none;
+                padding: 3mm 4mm;
+                margin: 4mm 0;
+                page-break-inside: avoid;
+                font-size: 11pt;
+                color: #000000;
+            }
+
+            .callout strong {
+                font-weight: 700;
+                color: #000000;
+                text-transform: none;
+                font-size: 11pt;
+                display: inline;
+                margin-bottom: 0;
+            }
+
+            /* ===== STATS GRID (Stack for print) ===== */
+            .stats-grid {
+                display: block !important;
+            }
+
+            .stat-card {
+                display: block;
+                background: transparent;
+                border: 1px solid #cccccc;
+                border-radius: 0;
+                box-shadow: none;
+                padding: 3mm 4mm;
+                margin-bottom: 3mm;
+                page-break-inside: avoid;
+                text-align: left;
+            }
+
+            .stat-card__value {
+                font-size: 16pt;
+                font-weight: 700;
+                color: #000000;
+                margin-bottom: 1mm;
+            }
+
+            .stat-card__label {
+                font-size: 10pt;
+                color: #000000;
+                font-weight: 600;
+                text-transform: none;
+                letter-spacing: 0;
+            }
+
+            /* ===== WORK PACKAGES (Stack for print) ===== */
+            .wp-list {
+                display: block !important;
+            }
+
+            .wp-card {
+                display: block;
+                border: 1px solid #cccccc;
+                border-radius: 0;
+                box-shadow: none;
+                padding: 3mm 4mm;
+                margin-bottom: 3mm;
+                page-break-inside: avoid;
+                flex-direction: column;
+            }
+
+            .wp-card:hover {
+                border-color: #cccccc;
+                box-shadow: none;
+            }
+
+            .wp-card__content {
+                flex: 1;
+                margin-bottom: 2mm;
+            }
+
+            .wp-card__title {
+                font-weight: 700;
+                color: #000000;
+                font-size: 11pt;
+                margin-bottom: 1mm;
+            }
+
+            .wp-card__description {
+                font-size: 10pt;
+                color: #000000;
+                margin-bottom: 1mm;
+                line-height: 1.5;
+            }
+
+            .wp-card__badge {
+                background: #f5f5f5;
+                color: #000000;
+                padding: 2mm 4mm;
+                border-radius: 0;
+                font-size: 9pt;
+                font-weight: 600;
+                white-space: nowrap;
+                float: none;
+                display: inline-block;
+                border: 1px solid #cccccc;
+            }
+
+            /* ===== TABLES ===== */
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 4mm 0;
+                page-break-inside: avoid;
+                font-size: 10pt;
+                color: #000000;
+            }
+
+            thead {
+                display: table-header-group;
+            }
+
+            tfoot {
+                display: table-footer-group;
+            }
+
+            th {
+                background: #f5f5f5 !important;
+                color: #000000;
+                font-weight: 700;
+                text-align: left;
+                padding: 2mm 3mm;
+                border: 1px solid #cccccc;
+                font-size: 10pt;
+                text-transform: none;
+                letter-spacing: 0;
+            }
+
+            td {
+                padding: 2mm 3mm;
+                border: 1px solid #cccccc;
+                font-size: 10pt;
+                color: #000000;
+                vertical-align: top;
+            }
+
+            tbody tr:nth-child(odd) {
+                background: #ffffff !important;
+            }
+
+            tbody tr:nth-child(even) {
+                background: #ffffff !important;
+            }
+
+            tr {
+                page-break-inside: avoid;
+            }
+
+            /* ===== FIGURES & IMAGES ===== */
+            figure {
+                margin: 6mm 0;
+                padding: 0;
+                border: none;
+                background: none !important;
+                page-break-inside: avoid;
+                text-align: center;
+            }
+
+            img {
+                max-width: 100%;
+                height: auto;
+                display: block;
+                margin: 0 auto 2mm;
+                box-shadow: none;
+                border-radius: 0;
+                border: none;
+                page-break-inside: avoid;
+            }
+
+            figcaption,
+            .caption {
+                font-size: 9pt;
+                color: #000000;
+                margin-top: 2mm;
+                font-style: italic;
+                line-height: 1.4;
+                text-align: left;
+            }
+
+            /* ===== CODE & PREFORMATTED ===== */
+            pre,
+            code {
+                background: #f5f5f5 !important;
+                border: 1px solid #dddddd;
+                border-radius: 0;
+                font-size: 9pt;
+                color: #000000;
+                page-break-inside: avoid;
+                font-family: var(--font-mono);
+            }
+
+            code {
+                padding: 1pt 2pt;
+            }
+
+            pre {
+                padding: 2mm 3mm;
+                margin: 4mm 0;
+                line-height: 1.4;
+                overflow-x: hidden;
+            }
+
+            pre code {
+                background: none;
+                border: none;
+                padding: 0;
+            }
+
+            /* ===== BLOCKQUOTES ===== */
+            blockquote {
+                background: #f5f5f5 !important;
+                border-left: 2pt solid var(--primary);
+                border-radius: 0;
+                padding: 3mm 4mm;
+                margin: 4mm 0;
+                font-style: italic;
+                color: #000000;
+                font-size: 10pt;
+                page-break-inside: avoid;
+                line-height: 1.5;
+            }
+
+            blockquote p {
+                margin: 0;
+            }
+
+            /* ===== FOOTER ===== */
+            footer {
+                border-top: 1px solid #cccccc;
+                background: none !important;
+                padding: 4mm 0 0 0;
+                margin-top: 8mm;
+                text-align: left;
+                font-size: 9pt;
+                color: #000000;
+                page-break-before: avoid;
+            }
+
+            footer p {
+                margin: 2pt 0;
+                font-size: 9pt;
+            }
+
+            /* ===== PRINT-SPECIFIC FIXES ===== */
+            /* Prevent orphans and widows */
+            h2 { widows: 3; orphans: 3; }
+            p { widows: 2; orphans: 2; }
+
+            /* Override hover states */
+            .stat-card:hover {
+                border-color: #cccccc;
+                box-shadow: none;
+            }
+
+            .wp-card:hover {
+                border-color: #cccccc;
+                box-shadow: none;
+            }
+
+            /* Force hide any web-specific elements */
+            nav, .nav, .navigation, .ads, .sidebar {
+                display: none !important;
+            }
+
+            /* Ensure flex/grid conversions work */
+            [style*="display: flex"],
+            [style*="display: grid"] {
+                display: block !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header__content">
+            <div class="header__nav">
+                <div class="header__logo">STRAND</div>
+                <div class="header__meta">
+                    <span>Functional Genomics</span>
+                </div>
+            </div>
+
+            <h1>ABCA4 Variant Triage Campaign</h1>
+            <p style="font-size:15px; color: var(--text-secondary); margin-bottom: var(--sp-md);">
+                Seth Morton, Sanjukta Bhattacharya
+            </p>
+            
+            <p class="header__subtitle">
+                From 2,116 variants of uncertain significance to a focused 30-variant panel
+                with assay design and CRO specifications. An end-to-end example of how to turn
+                a variant backlog into a concrete experiment plan.
+            </p>
+
+            <div class="header__meta-line">
+                <span><strong>{{ manifest.metadata.date }}</strong></span>
+                <span>Version 1.0 • Exploratory showcase</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- PROBLEM STATEMENT -->
+        <div class="content">
+            <section>
+                <h2>The Problem</h2>
+                
+                <p>
+                    ABCA4 is a transmembrane ATP transporter that keeps photoreceptor cells healthy. Mutations cause Stargardt disease
+                    and other inherited retinal dystrophies, which are a major cause of vision loss in children and young adults.
+                </p>
+
+                <p>
+                    ClinVar and research databases now list more than two thousand ABCA4 variants with
+                    <strong>uncertain significance</strong>. For a clinical lab, this creates an uncomfortable choice:
+                    run slow, one-off assays for each variant, or leave most of them untested.
+                </p>
+
+                <p>
+                    Many variants end up parked in limbo. Little functional data, limited clinical evidence, and no obvious path
+                    to a focused experiment plan.
+                </p>
+
+                <div class="callout">
+                    <strong>Our question:</strong> Can we use model scores, simple priors, and a small amount of optimization
+                    to decide which variants are most informative to test first, then turn that decision into a concrete study
+                    plan a CRO could run without heavy customization?
+                </div>
+            </section>
+        </div>
+
+        <!-- APPROACH -->
+        <div class="content">
+            <section>
+                <h2>Our Approach</h2>
+                
+                <h3>1. Predict Impact Scores</h3>
+                <p>
+                    We combine multiple prediction sources into a single blended impact score:
+                </p>
+                <ul>
+                    <li><strong>AlphaMissense</strong> - structure-based pathogenicity</li>
+                    <li><strong>SpliceAI</strong> - splice disruption scores</li>
+                    <li><strong>Conservation</strong> - is the residue conserved across evolution?</li>
+                    <li><strong>Allele frequency</strong> - is this variant truly rare?</li>
+                    <li><strong>Domain context</strong> - does it hit a functional domain?</li>
+                </ul>
+                <p>
+                    Each signal is transparent and re-weightable. As new models or data arrive, we tune the weights.
+                </p>
+
+                <h3>2. Cluster by Mechanism</h3>
+                <p>
+                    If we simply took the 30 highest-scoring variants, most of the panel would live in one structural region.
+                    That would be efficient on paper but would miss splicing defects, trafficking problems, and other mechanisms.
+                </p>
+                <p>
+                    Instead, we <strong>cluster variants by functional domain and consequence type</strong>, creating distinct groups
+                    that capture the main ways ABCA4 can fail.
+                </p>
+
+                <h3>3. Optimize Under Constraints</h3>
+                <p>
+                    We select {{ manifest.k }} variants to maximize cluster representation while staying within a realistic experimental budget.
+                    The optimizer gives up a small amount of score to gain much broader mechanistic coverage.
+                </p>
+
+                <h3>4. Generate CRO-Ready Specs</h3>
+                <p>
+                    The selected variants are organized into {{ manifest.work_packages | length }} concurrent assay modules. Each module has
+                    variant lists, experimental designs, material requirements, and simple QC gates. A CRO could start work quickly.
+                </p>
+            </section>
+        </div>
+
+        <!-- KEY METRICS -->
+        <div class="content">
+            <section>
+                <h2>Campaign Summary</h2>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-card__value">{{ manifest.total_variants }}</div>
+                        <div class="stat-card__label">Starting Variants (ClinVar VUS)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__value">{{ manifest.k }}</div>
+                        <div class="stat-card__label">Selected for Testing</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__value">{{ manifest.clusters_covered }}/{{ manifest.total_clusters }}</div>
+                        <div class="stat-card__label">Functional Clusters Represented</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__value">{{ manifest.work_packages | length }}</div>
+                        <div class="stat-card__label">Concurrent Assay Modules</div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- RESULTS -->
+        <div class="content">
+            <section>
+                <h2>Results</h2>
+
+                <h3>Impact Score Distribution</h3>
+                <figure>
+                    <img src="figures/figure1a_impact.png" alt="Impact score distribution for candidates and selected panel">
+                    <figcaption>
+                        <strong>Figure 1a:</strong> Impact scores for all candidates are heavily skewed toward zero.
+                        The selected panel tilts toward the high-score tail while still sampling across the broader distribution.
+                    </figcaption>
+                </figure>
+
+                <h3>Population Frequency Challenge</h3>
+                <figure>
+                    <img src="figures/figure1b_af_vs_impact.png" alt="Allele frequency vs impact score for all and selected variants">
+                    <figcaption>
+                        <strong>Figure 1b:</strong> Most ABCA4 variants are extremely rare on the gnomAD frequency axis.
+                        The panel sits in the low-frequency, higher-impact region, showing that rarity alone is not enough without model scores.
+                    </figcaption>
+                </figure>
+
+                <h3>Optimization Trade-off</h3>
+                <figure>
+                    <img src="figures/figure2_optimization.png" alt="Score and coverage tradeoff between naive and coverage-aware selection">
+                    <figcaption>
+                        <strong>Figure 2:</strong> Comparison of a pure top-score panel with the coverage-aware panel.
+                        The coverage-aware panel keeps most of the total score while doubling the number of distinct clusters covered.
+                    </figcaption>
+                </figure>
+
+                <h3>Selected Variant Panel</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Variant</th>
+                            <th>Consequence</th>
+                            <th>Impact Score</th>
+                            <th>Cluster</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                        <tr>
+                            <td>1</td>
+                            <td><code>1_94031001_G_T</code></td>
+                            <td>missense_variant</td>
+                            <td><strong>0.504</strong></td>
+                            <td>NBD2_missense_variant</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>2</td>
+                            <td><code>1_94112975_T_A</code></td>
+                            <td>missense_variant</td>
+                            <td><strong>0.421</strong></td>
+                            <td>other_missense_variant,splice_region_variant</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>3</td>
+                            <td><code>1_94063316_C_T</code></td>
+                            <td>missense_variant</td>
+                            <td><strong>0.388</strong></td>
+                            <td>NBD1_missense_variant,splice_region_variant</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>4</td>
+                            <td><code>1_94001011_G_A</code></td>
+                            <td>missense_variant</td>
+                            <td><strong>0.397</strong></td>
+                            <td>CTD_missense_variant</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>5</td>
+                            <td><code>1_94044743_A_G</code></td>
+                            <td>missense_variant</td>
+                            <td><strong>0.381</strong></td>
+                            <td>TMD1_missense_variant,splice_region_variant</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>6</td>
+                            <td><code>1_94037152_A_C</code></td>
+                            <td>missense_variant</td>
+                            <td><strong>0.359</strong></td>
+                            <td>TMD2_missense_variant</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>7</td>
+                            <td><code>1_94042898_C_T</code></td>
+                            <td>missense_variant</td>
+                            <td><strong>0.368</strong></td>
+                            <td>TMD2_missense_variant,splice_region_variant</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>8</td>
+                            <td><code>1_94055291_C_T</code></td>
+                            <td>missense_variant</td>
+                            <td><strong>0.338</strong></td>
+                            <td>TMD1_missense_variant</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>9</td>
+                            <td><code>1_94060753_C_A</code></td>
+                            <td>missense_variant</td>
+                            <td><strong>0.318</strong></td>
+                            <td>NBD1_missense_variant</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>10</td>
+                            <td><code>1_94029445_C_G</code></td>
+                            <td>missense_variant</td>
+                            <td><strong>0.311</strong></td>
+                            <td>NBD2_missense_variant,splice_region_variant</td>
+                        </tr>
+                        
+                    </tbody>
+                </table>
+            </section>
+        </div>
+
+        <!-- WORK PACKAGES -->
+        <div class="content">
+            <section>
+                <h2>CRO-Ready Work Packages</h2>
+
+                <p>
+                    The 30 variants are organized into 5 concurrent assay modules. Each can run in parallel. Each includes
+                    full experimental designs, material lists, and QC specs.
+                </p>
+
+                <div class="wp-list">
+                    
+                    <div class="wp-card">
+                        <div class="wp-card__content">
+                            <div class="wp-card__title">DSF_SEC</div>
+                            <div class="wp-card__description">
+                                
+                                Differential Scanning Fluorimetry + Size Exclusion Chromatography: assess protein stability, melting temperature, and oligomeric state.
+                                
+                            </div>
+                        </div>
+                        <div class="wp-card__badge">28 variants</div>
+                    </div>
+                    
+                    <div class="wp-card">
+                        <div class="wp-card__content">
+                            <div class="wp-card__title">FUNCTIONAL</div>
+                            <div class="wp-card__description">
+                                
+                                Transport activity assays: quantify substrate kinetics and functional impact.
+                                
+                            </div>
+                        </div>
+                        <div class="wp-card__badge">28 variants</div>
+                    </div>
+                    
+                    <div class="wp-card">
+                        <div class="wp-card__content">
+                            <div class="wp-card__title">RNA_SEQ_REPORTER</div>
+                            <div class="wp-card__description">
+                                
+                                RNA-seq reporter assays: measure differential expression and alternative splicing.
+                                
+                            </div>
+                        </div>
+                        <div class="wp-card__badge">2 variants</div>
+                    </div>
+                    
+                    <div class="wp-card">
+                        <div class="wp-card__content">
+                            <div class="wp-card__title">SPLICE_MINIGENE</div>
+                            <div class="wp-card__description">
+                                
+                                Splice minigene reporters: quantify exon inclusion/exclusion ratios.
+                                
+                            </div>
+                        </div>
+                        <div class="wp-card__badge">2 variants</div>
+                    </div>
+                    
+                    <div class="wp-card">
+                        <div class="wp-card__content">
+                            <div class="wp-card__title">TRAFFICKING</div>
+                            <div class="wp-card__description">
+                                
+                                Cell surface localization: measure subcellular trafficking and membrane insertion efficiency.
+                                
+                            </div>
+                        </div>
+                        <div class="wp-card__badge">28 variants</div>
+                    </div>
+                    
+                </div>
+
+                <h3>Mechanistic Coverage</h3>
+                <figure>
+                    <img src="figures/figure3_mechanisms.png" alt="Distribution of selected variants across assay modules">
+                    <figcaption>
+                        <strong>Figure 3:</strong> Number of selected variants assigned to each assay module.
+                        Stability, trafficking, function, and splicing all receive meaningful representation.
+                    </figcaption>
+                </figure>
+            </section>
+        </div>
+
+        <!-- METHODS -->
+        <div class="content">
+            <section>
+                <h2>Methods</h2>
+
+                <h3>Data Sources</h3>
+                <p>
+                    2116 ABCA4 variants from ClinVar, annotated with VEP consequence predictions, gnomAD allele frequencies,
+                    and protein domain assignments from Ensembl.
+                </p>
+
+                <h3>Impact Score Formula</h3>
+                <p>
+                    A transparent, tunable blend of four ingredients:
+                </p>
+                <ul>
+                    <li>Missense model score</li>
+                    <li>Splice disruption score</li>
+                    <li>Conservation around the affected residue</li>
+                    <li>A modest penalty for higher allele frequency</li>
+                </ul>
+                <p>
+                    The exact weights are gene specific and easy to adjust as experimental results come back. The goal is not a perfect model,
+                    but a simple score that is easy to inspect and refine.
+                </p>
+
+                <h3>Clustering</h3>
+                <p>
+                    Variants grouped by protein domain (NBD1, NBD2, TMD1, TMD2, CTD, etc.) and consequence type (missense, splice region, etc.),
+                    yielding 35 functional clusters. Ensures mechanistic diversity in the final panel.
+                </p>
+
+                <h3>Optimization</h3>
+                <p>
+                    We use a simple greedy, coverage-aware selection rule with a penalty on over-representing any single cluster.
+                    The goal is to maximize the number of distinct mechanisms covered while keeping the panel size and experimental
+                    timeline reasonable.
+                </p>
+
+                <h3>CRO Organization</h3>
+                <p>
+                    Variants are mapped to assay modules based on predicted mechanism. Each module has a design matrix,
+                    material requirements, and a short experimental specification. Protocol drafts can be generated automatically
+                    and then refined by the team.
+                </p>
+            </section>
+        </div>
+
+        <!-- DISCUSSION & IMPACT -->
+        <div class="content">
+            <section>
+                <h2>What This Enables</h2>
+
+                <p>
+                    This v1.0 campaign is a proof-of-concept for a broader functional genomics platform. The workflow is generalizable:
+                </p>
+
+                <h3>For labs and diagnostics</h3>
+                <ul>
+                    <li>Turn a variant backlog into a prioritized experiment plan within days</li>
+                    <li>Reduce guesswork in variant triage; use AI + priors instead</li>
+                    <li>Get CRO-ready specs quickly, without custom protocol writing</li>
+                    <li>Build clinical evidence for variants faster</li>
+                </ul>
+
+                <h3>For CRO partners</h3>
+                <ul>
+                    <li>Reduce design iteration; receive fully specified assay modules</li>
+                    <li>Execute larger, more focused campaigns with lower rework</li>
+                </ul>
+
+                <h3>Limitations & Next Steps</h3>
+                <ul>
+                    <li>v1.0 scores are simplified; will improve with experimental feedback</li>
+                    <li>Rare variants may lack sufficient population data for confident AF filtering</li>
+                    <li>Assay readouts may not capture all aspects of variant impact (tissue context, regulatory crosstalk, etc.)</li>
+                    <li>Future iterations: DNA foundation models, virtual cell signals, RL-based refinement as data accumulates</li>
+                </ul>
+            </section>
+        </div>
+
+        <!-- CONCLUSION -->
+        <div class="content">
+            <section>
+                <h2>Bottom Line</h2>
+
+                <p>
+                    ABCA4 v1.0 takes thousands of variants of uncertain significance, a clinical bottleneck,
+                    and compresses them into a focused {{ manifest.k }}-variant panel with CRO-ready experiment designs.
+                </p>
+
+                <p>
+                    The workflow is repeatable. The scoring is transparent and improvable. The CRO specs are actionable.
+                </p>
+
+                <p>
+                    This is what automating variant triage looks like.
+                </p>
+            </section>
+        </div>
+
+        <!-- REFERENCES -->
+        <div class="content">
+            <section>
+                <h2>References & Tools</h2>
+                <ul>
+                    <li><a href="https://www.ncbi.nlm.nih.gov/clinvar/">ClinVar</a> – Clinical significance and variant annotations</li>
+                    <li><a href="https://gnomad.broadinstitute.org/">gnomAD</a> – Population allele frequencies</li>
+                    <li><a href="https://github.com/google-deepmind/alphamissense">AlphaMissense</a> – Structure-based pathogenicity</li>
+                    <li><a href="https://github.com/Illumina/SpliceAI">SpliceAI</a> – Splicing impact prediction</li>
+                    <li><a href="https://ensembl.org/info/docs/tools/vep/index.html">Ensembl VEP</a> – Variant effect prediction</li>
+                </ul>
+            </section>
+        </div>
+    </div>
+
+    <footer>
+        <p>
+            <strong>ABCA4 Campaign Report v1.0</strong> – Strand's automated variant triage and experiment planning platform.
+        </p>
+        <p>
+            Generated 2025-11-17 | For inquiries: <a href="mailto:seth@strand.tools">seth@strand.tools</a>
+        </p>
+    </footer>
+</body>
+</html>

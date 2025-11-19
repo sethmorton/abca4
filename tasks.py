@@ -21,13 +21,17 @@ NOTEBOOKS = CAMPAIGN_ROOT / "notebooks"
 SRC = CAMPAIGN_ROOT / "src"
 
 
-def _run_script(c, script_path: Path, description: str, optional: bool = False):
+def _run_script(c, script_path: Path, description: str, optional: bool = False, args: list = None):
     if not script_path.exists():
         if optional:
             print(f"⚠️  Skipping {description} (missing {script_path})")
             return
         raise FileNotFoundError(f"Required script not found: {script_path}")
-    c.run(f"uv run python {script_path}")
+
+    cmd = f"uv run python {script_path}"
+    if args:
+        cmd += " " + " ".join(str(arg) for arg in args)
+    c.run(cmd)
 
 @task
 def setup_dev(c):
@@ -75,33 +79,50 @@ def download_data(c):
     (DATA_RAW / "spliceai").mkdir(exist_ok=True)
     (DATA_RAW / "alphamissense").mkdir(exist_ok=True)
 
+    downloads = [
+        ("ClinVar", SRC / "data" / "download_clinvar.py"),
+        ("gnomAD", SRC / "data" / "download_gnomad.py"),
+        ("SpliceAI", SRC / "data" / "download_spliceai.py"),
+        ("AlphaMissense", SRC / "data" / "download_alphamissense.py"),
+    ]
+
+    failed_downloads = []
+
     with c.cd(str(REPO_ROOT)):
-        print("🧬 Downloading ClinVar data...")
-        _run_script(c, SRC / "data" / "download_clinvar.py", "ClinVar download")
+        for name, script_path in downloads:
+            print(f"🧬 Downloading {name} data...")
+            try:
+                _run_script(c, script_path, f"{name} download")
+                print(f"✅ {name} download completed")
+            except Exception as e:
+                print(f"❌ {name} download failed: {e}")
+                failed_downloads.append(name)
 
-        print("🧬 Downloading gnomAD data...")
-        _run_script(c, SRC / "data" / "download_gnomad.py", "gnomAD download")
-
-        print("🧬 Downloading SpliceAI data...")
-        _run_script(c, SRC / "data" / "download_spliceai.py", "SpliceAI download")
-
-        print("🧬 Downloading AlphaMissense data...")
-        _run_script(c, SRC / "data" / "download_alphamissense.py", "AlphaMissense download")
-
-    print("✅ All datasets downloaded!")
+    if failed_downloads:
+        print(f"\n⚠️  Some downloads failed: {', '.join(failed_downloads)}")
+        print("💡 You can retry individual downloads:")
+        for name in failed_downloads:
+            script_name = name.lower().replace(" ", "_")
+            print(f"   uv run python src/data/download_{script_name}.py")
+        print("\n📊 Other downloads completed successfully!")
+    else:
+        print("✅ All datasets downloaded!")
 
 @task
-def process_variants(c):
-    """Process and filter ABCA4 variants from raw data"""
-    print("🔍 Processing ABCA4 variants...")
+def process_variants(c, gene="ABCA4"):
+    """Process and filter variants from raw data"""
+    print(f"🔍 Processing {gene} variants...")
 
     DATA_PROCESSED.mkdir(exist_ok=True)
     (DATA_PROCESSED / "variants").mkdir(exist_ok=True)
 
     with c.cd(str(REPO_ROOT)):
-        _run_script(c, SRC / "data" / "filter_abca4_variants.py", "variant filtering")
+        # Pass gene as environment variable so scripts can use it
+        env = os.environ.copy()
+        env["GENE_NAME"] = gene
+        _run_script(c, SRC / "data" / "filter_clinvar_variants.py", f"variant filtering for {gene}")
 
-    print("✅ ABCA4 variants processed!")
+    print(f"✅ {gene} variants processed!")
 
 @task
 def annotate_variants(c):
@@ -145,6 +166,29 @@ def run_optimization(c):
     print("✅ Optimization complete!")
 
 @task
+def assay_drafts(c):
+    """Generate LLM-powered assay drafts for selected variants"""
+    print("🤖 Generating assay drafts using LLM...")
+
+    from src.config import REPORTS_DIR
+    selected_variants = REPORTS_DIR / "variants_selected.csv"
+
+    if not selected_variants.exists():
+        print("❌ Selected variants file not found. Run optimization first.")
+        raise FileNotFoundError(f"Missing {selected_variants}")
+
+    with c.cd(str(REPO_ROOT)):
+        _run_script(
+            c,
+            SRC / "reporting" / "generate_assay_drafts.py",
+            "assay draft generator"
+            # No args needed - CLI defaults to variants_selected.csv
+        )
+
+    print("✅ Assay drafts generated!")
+    print(f"📂 Outputs: data_processed/reports/assay_drafts/")
+
+@task
 def generate_report(c):
     """Generate final reports and dashboards"""
     print("📊 Generating reports...")
@@ -157,18 +201,43 @@ def generate_report(c):
     print("✅ Reports generated!")
 
 @task
-def run_pipeline(c):
-    """Run the complete ABCA4 pipeline end-to-end"""
-    print("🔬 Running complete ABCA4 campaign pipeline...")
+def generate_pdf(c):
+    """Generate PDF from the ABCA4 report HTML using Playwright"""
+    print("📄 Generating ABCA4 report PDF...")
+
+    with c.cd(str(REPO_ROOT)):
+        _run_script(c, SRC / "reporting" / "generate_pdf.py", "PDF generation")
+
+    print("✅ PDF report generated!")
+
+@task
+def generate_full_report_pdf(c):
+    """Generate PDF from the ABCA4 report HTML"""
+    print("📄 Generating ABCA4 report PDF...")
+
+    from src.reporting.generate_pdf import generate_full_report_pdf
+
+    try:
+        pdf_path = generate_full_report_pdf()
+        print(f"✅ Report PDF generated: {pdf_path}")
+    except Exception as e:
+        print(f"❌ Failed to generate report PDF: {e}")
+        raise
+
+@task
+def run_pipeline(c, gene="ABCA4"):
+    """Run the complete campaign pipeline end-to-end for a gene"""
+    print(f"🔬 Running complete {gene} campaign pipeline...")
 
     download_data(c)
-    process_variants(c)
+    process_variants(c, gene=gene)
     annotate_variants(c)
     compute_features(c)
     run_optimization(c)
+    assay_drafts(c)
     generate_report(c)
 
-    print("🎉 ABCA4 campaign complete!")
+    print(f"🎉 {gene} campaign complete!")
 
 @task
 def explore_data(c):
@@ -335,15 +404,21 @@ notebook_ns.add_task(explore_data, 'explore')
 notebook_ns.add_task(tune_features, 'tune')
 notebook_ns.add_task(optimize_interactive, 'optimize')
 
+reporting_ns = Collection('reporting')
+reporting_ns.add_task(generate_report, 'generate')
+reporting_ns.add_task(assay_drafts, 'drafts')
+reporting_ns.add_task(generate_pdf, 'pdf')
+reporting_ns.add_task(generate_full_report_pdf, 'full-pdf')
+
 # Main namespace
 ns = Collection()
 ns.add_task(setup_dev)
 ns.add_task(run_pipeline)
 ns.add_task(run_optimization)
-ns.add_task(generate_report)
 ns.add_task(clean_data)
 ns.add_task(test_pipeline)
 ns.add_collection(data_ns)
 ns.add_collection(features_ns)
+ns.add_collection(reporting_ns)
 ns.add_collection(cro_ns)
 ns.add_collection(notebook_ns)

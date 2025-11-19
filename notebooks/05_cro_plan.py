@@ -56,6 +56,7 @@ def __(mo):
     # Navigation tabs
     tabs = mo.ui.tabs({
         "📊 Overview": "overview",
+        "🤖 Assay Drafts": "drafts",
         "🔬 Assay Assignments": "assignments",
         "📦 Work Packages": "workpackages",
         "🧪 Experimental Designs": "designs",
@@ -209,6 +210,91 @@ def __(tabs, data, loaded_successfully, mo, pd):
                 # Detailed assignments table
                 mo.md("### Detailed Assignments")
                 mo.table(summary_df, selection="multi")
+
+
+@app.cell
+def __(tabs, mo, Path, pd):
+    """LLM-generated assay drafts review."""
+    if tabs.value == "drafts":
+        mo.md("## 🤖 LLM-Generated Assay Drafts")
+
+        ASSAY_DRAFTS_DIR = Path("data_processed/reports/assay_drafts")
+
+        if not ASSAY_DRAFTS_DIR.exists():
+            mo.callout("Assay drafts not found. Run `invoke reporting.drafts` first.", kind="warning")
+            mo.md("""
+            **Generate assay drafts:**
+            ```bash
+            uv run invoke reporting.drafts
+            ```
+
+            This will create LLM-generated assay protocols for the selected variants.
+            """)
+        else:
+            # Load index file
+            index_path = ASSAY_DRAFTS_DIR / "assay_drafts_index.json"
+            if index_path.exists():
+                with open(index_path, "r") as f3:
+                    index_data = json.load(f3)
+
+                mo.md("### Draft Generation Summary")
+                metadata = index_data.get("metadata", {})
+                mo.md(f"""
+                - **Total Variants:** {metadata.get('total_variants', 0)}
+                - **Successful Drafts:** {metadata.get('successful_drafts', 0)}
+                - **Failed Drafts:** {metadata.get('failed_drafts', 0)}
+                - **Model:** {metadata.get('llm_config', {}).get('model', 'unknown')}
+                - **Run ID:** {metadata.get('run_id', 'unknown')[:8]}
+                """)
+
+                drafts = index_data.get("drafts", [])
+                if drafts:
+                    # Show summary table
+                    draft_summary = []
+                    for draft in drafts:
+                        if draft.get('status') == 'success':
+                            draft_summary.append({
+                                'Rank': draft.get('rank', 0),
+                                'Variant': draft.get('variant_id', ''),
+                                'Impact Score': ".3f",
+                                'File': draft.get('filename', ''),
+                                'Status': '✅ Generated'
+                            })
+                        else:
+                            draft_summary.append({
+                                'Rank': draft.get('rank', 0),
+                                'Variant': draft.get('variant_id', ''),
+                                'Impact Score': ".3f",
+                                'File': 'N/A',
+                                'Status': f'❌ Failed: {draft.get("error", "Unknown")}'
+                            })
+
+                    summary_df2 = pd.DataFrame(draft_summary)
+                    mo.table(summary_df2, selection=None)
+
+                    mo.md("""
+                    ---
+
+                    ### 📋 Individual Draft Review
+
+                    **⚠️ Important:** These are LLM-generated assay protocols that require human review and validation.
+
+                    Expand each section below to review the generated assay drafts:
+                    """)
+
+                    # Show individual drafts
+                    for draft in drafts:
+                        if draft.get('status') == 'success':
+                            draft_path = ASSAY_DRAFTS_DIR / "protocol_drafts" / draft.get('filename', '')
+                            if draft_path.exists():
+                                with open(draft_path, "r") as f2:
+                                    content = f2.read()
+
+                                with mo.expander(f"📄 {draft.get('variant_id')} - Rank {draft.get('rank')}"):
+                                    mo.md(content)
+                                    mo.md("*🤖 LLM-generated protocol - human review required*")
+            else:
+                mo.callout("Assay drafts index not found.", kind="error")
 
 
 @app.cell

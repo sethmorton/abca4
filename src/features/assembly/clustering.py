@@ -10,29 +10,50 @@ Ensures every variant has:
 
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 import json
 
 import pandas as pd
 from src.config import logger
+from src.config import load_gene_config
 
 CAMPAIGN_ROOT = Path(__file__).resolve().parents[2]
 
 
 class ClusteringProcessor:
-    """Add Step 5 clustering to scored variants."""
+    """Add Step 5 clustering to scored variants using config-driven parameters."""
 
-    def __init__(self, features_dir: Optional[Path] = None):
+    def __init__(self, gene_name: str, features_dir: Optional[Path] = None, config: Optional[Dict] = None):
+        """
+        Initialize clustering processor.
+        
+        Args:
+            gene_name: Gene symbol (e.g., "ABCA4") - REQUIRED, no default
+            features_dir: Directory for features
+            config: Optional pre-loaded gene config. If not provided, loads from config file.
+            
+        Raises:
+            ValueError: If gene_name is empty or invalid
+        """
+        if not gene_name or not isinstance(gene_name, str) or gene_name.strip() == "":
+            raise ValueError("gene_name is required and must be a non-empty string")
+        
+        self.gene_name = gene_name
+        self.config = config or load_gene_config(gene_name)
+        
         processed_root = CAMPAIGN_ROOT / "data_processed"
         self.features_dir = features_dir or (processed_root / "features")
         self.features_dir.mkdir(parents=True, exist_ok=True)
 
     def load_scored_variants(self) -> Optional[pd.DataFrame]:
-        """Load variants_features_raw.parquet (with impact scores and metadata)."""
+        """Load variants with scored features (with impact scores and metadata)."""
+        # Use gene prefix for all filenames
+        file_prefix = self.config.get("file_prefix", self.gene_name.lower())
+        
         # First try variants_features_raw.parquet (has impact scores and metadata)
-        features_raw_path = self.features_dir / "variants_features_raw.parquet"
-        scored_path = self.features_dir / "variants_scored.parquet"
-        metadata_path = self.features_dir / "variants_scored.metadata.json"
+        features_raw_path = self.features_dir / f"{file_prefix}_variants_features_raw.parquet"
+        scored_path = self.features_dir / f"{file_prefix}_variants_scored.parquet"
+        metadata_path = self.features_dir / f"{file_prefix}_variants_scored.metadata.json"
 
         load_path = None
         if features_raw_path.exists():
@@ -65,25 +86,31 @@ class ClusteringProcessor:
             return None
 
     def apply_domain_boost(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Apply domain-aware scoring boost to model_score."""
+        """Apply domain-aware scoring boost to model_score using config factors."""
         df_boosted = df.copy()
 
         if 'domain' not in df_boosted.columns or 'model_score' not in df_boosted.columns:
             logger.warning("Domain or model_score column missing; skipping domain boost")
             return df_boosted
 
-        # Domain boost factors (biology-aware)
-        domain_boost = {
-            'NBD1': 1.15,       # +15% - nucleotide binding, critical
-            'NBD2': 1.15,       # +15% - nucleotide binding, critical
-            'TMD1': 1.05,       # +5% - transmembrane domains 1-6
-            'TMD2': 1.05,       # +5% - transmembrane domains 7-12
+        # Get domain boost factors from config, with defaults for common non-coding domains
+        domain_boost = self.config.get('domain_boost_factors', {})
+        
+        # Add sensible defaults for non-coding domains if not in config
+        defaults = {
             'CTD': 1.0,         # No boost
             'intronic': 1.0,    # No boost
             'utr': 0.95,        # Slight penalty
             'other': 1.0,       # No boost
             'unknown': 1.0,     # No boost
+            'regulatory': 1.0,  # No boost
+            'synonymous': 0.9,  # Slight penalty
+            'splice_region': 1.0, # No boost
         }
+        
+        for domain, factor in defaults.items():
+            if domain not in domain_boost:
+                domain_boost[domain] = factor
 
         original_scores = df_boosted['model_score'].copy()
         df_boosted['model_score'] = df_boosted.apply(
@@ -131,8 +158,9 @@ class ClusteringProcessor:
             df_clustered["cluster_id"] = df_clustered["domain"].fillna("unknown")
 
             # For domains with many variants, sub-cluster by consequence
+            large_threshold = self.config.get('clustering', {}).get('large_cluster_threshold', 10)
             domain_counts = df_clustered["cluster_id"].value_counts()
-            large_domains = domain_counts[domain_counts > 10].index
+            large_domains = domain_counts[domain_counts > large_threshold].index
 
             for domain in large_domains:
                 mask = df_clustered["cluster_id"] == domain
@@ -274,9 +302,10 @@ class ClusteringProcessor:
         return df_with_coverage
 
     def save_clustered_variants(self, df: pd.DataFrame) -> bool:
-        """Save variants with clustering info to variants_scored.parquet."""
-        output_path = self.features_dir / "variants_scored.parquet"
-        metadata_path = self.features_dir / "variants_scored.metadata.json"
+        """Save variants with clustering info."""
+        file_prefix = self.config.get("file_prefix", self.gene_name.lower())
+        output_path = self.features_dir / f"{file_prefix}_variants_scored.parquet"
+        metadata_path = self.features_dir / f"{file_prefix}_variants_scored.metadata.json"
         
         try:
             df.to_parquet(output_path, index=False)
@@ -387,11 +416,31 @@ Run feature engineering pipeline first if these are missing.
 
 
 def main():
-    """Main entry point."""
-    processor = ClusteringProcessor()
-    success = processor.run()
-    sys.exit(0 if success else 1)
+    """Main entry point - requires gene to be specified via --gene or GENE_NAME env var."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Add clustering to scored variants")
+    parser.add_argument("--gene", type=str, default=os.getenv("GENE_NAME", None),
+                       help="Gene symbol (required: pass via --gene or GENE_NAME env var)")
+    args = parser.parse_args()
+    
+    if not args.gene:
+        parser.error(
+            "❌ ERROR: Gene symbol required but not provided.\n"
+            "Please specify one of:\n"
+            "  1. Command line: python script.py --gene GENE_NAME\n"
+            "  2. Environment: export GENE_NAME=GENE_NAME"
+        )
+    
+    try:
+        processor = ClusteringProcessor(args.gene)
+        success = processor.run()
+        sys.exit(0 if success else 1)
+    except ValueError as e:
+        logger.error(f"Configuration error: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
+    import os
     main()

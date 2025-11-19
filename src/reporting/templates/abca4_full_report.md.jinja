@@ -1,0 +1,385 @@
+# ABCA4 Variant Triage Campaign
+
+**A Functional Genomics Platform in Action**
+
+**Seth Morton**<sup>1</sup>, **Sanjukta Bhattacharya**<sup>1</sup>
+
+<sup>1</sup>Strand Labs, USA
+
+*Exploratory Showcase – Version 1.0*
+
+**Date:** {{ metadata.date }}
+
+**Campaign ID:** ABCA4-v1-2025
+
+---
+
+## Executive Summary
+
+**The Challenge:** ABCA4, a photoreceptor ATP transporter critical for retinal function, has over 2,000 variants classified as uncertain significance in ClinVar. For labs and clinicians, this creates a paralyzing backlog: too many variants to test individually, too little data to prioritize confidently.
+
+**Our Solution:** Strand's automated planning stack turns variant triage from art into engineering. We take {{ snapshot.total_variants }} ABCA4 VUS and compress them into a focused {{ selection.k }}-variant panel with a concrete CRO-ready study plan that a retinal genetics team can execute immediately.
+
+**How We Did It:**
+
+- **Blended Scoring:** AlphaMissense, SpliceAI, conservation (PhyloP/phastCons), allele frequency, and domain context combine into a transparent, tunable impact score.
+
+- **Coverage-Aware Selection:** Rather than greedily picking the {{ selection.k }} highest-scoring variants (which would cluster in NBD1), our optimizer selects {{ selection.k }} variants spanning {{ selection.clusters_covered }} of {{ selection.total_clusters }} functional clusters.
+
+- **CRO-Ready Workflows:** The selected variants are organized into {{ cro_summary.work_package_count }} assay modules (DSF/SEC, trafficking, functional, RNA-seq, splice minigene), each with experimental designs, material specs, and QC gates.
+
+This report is a v1.0 slice of the system we are building at Strand. The goal is to show how we go from a messy variant backlog to a concrete experiment plan, not to present a final ABCA4 biology story.
+
+### What we start from
+
+- {{ snapshot.total_variants }} ABCA4 variants classified as "uncertain significance" in ClinVar
+
+- Sparse but useful context: gnomAD allele frequencies, consequence annotations, protein domains, and splicing predictions
+
+- A notional budget for about thirty variants worth of functional work
+
+### What the system does
+
+1. **Ingest and featurize**
+
+   Pull in variants, annotate with VEP, attach model scores and priors, and build a feature matrix per variant.
+
+2. **Score and cluster**
+
+   Combine missense, splicing, conservation, and allele frequency into a single impact score and group variants into {{ selection.total_clusters }} functional clusters.
+
+3. **Optimize under constraints**
+
+   Select {{ selection.k }} variants that trade a small amount of score for better coverage across mechanisms, regions, and assay types.
+
+### What a partner walks away with
+
+- A {{ selection.k }} variant panel with per variant rationale and metadata
+
+- {{ cro_summary.work_package_count }} CRO ready work packages, each tied to specific assay modules
+
+- Optional protocol drafts that make it easy to route the plan to a CRO or internal core
+
+---
+
+## Abstract
+
+We built an automated planning stack that turns a large ABCA4 variant backlog into a focused experimental campaign.
+
+Starting from {{ snapshot.total_variants }} ABCA4 variants of uncertain significance in ClinVar, we compute a blended impact score using AlphaMissense, SpliceAI, conservation statistics, and allele frequency. We cluster variants into {{ selection.total_clusters }} functional groups and use a simple coverage aware optimizer to select a {{ selection.k }} variant panel that spans {{ selection.clusters_covered }} of those clusters.
+
+The selected panel is organized into {{ cro_summary.work_package_count }} work packages that cover stability, trafficking, function, and splicing assays. For each work package we generate design matrices, quality control checks, and material requirements. The output is a CRO ready campaign spec that a retinal genetics team could run with modest adaptation.
+
+This report documents ABCA4 v1.0 as a concrete example of that end to end flow.
+
+---
+
+## 1. Introduction
+
+ABCA4 is a photoreceptor transporter that sits at the center of Stargardt disease and related retinal dystrophies. ClinVar and research panels now contain over a thousand ABCA4 variants labelled as variants of uncertain significance. For labs and clinicians this creates a backlog: many variants that could matter, very little functional evidence, and limited assay budget.
+
+This report focuses on that practical problem. Given a long tail of ABCA4 variants and a finite number of experiments, which ones should we test first and how do we turn that choice into a concrete study plan.
+
+The ABCA4 v1.0 campaign is a demonstration of Strand's approach:
+
+- Use model scores and simple priors to build a transparent impact score
+
+- Use optimization to select a panel that balances score and coverage
+
+- Organize that panel into work packages that a CRO can execute
+
+ABCA4 is our first dataset, but the stack is designed to generalize to other genes and eventually to broader functional genomics campaigns.
+
+---
+
+## 2. Methods
+
+### 2.1 Data sources
+
+We analyzed {{ snapshot.total_variants }} ABCA4 variants labeled as "uncertain significance" in ClinVar. Variants were annotated with Ensembl VEP and mapped to protein domains, regulatory regions, and splice contexts.
+
+Where available, we attached external scores and priors:
+
+- gnomAD v4.1 exome and genome allele frequencies
+
+- AlphaMissense missense pathogenicity scores
+
+- SpliceAI donor and acceptor gain and loss scores
+
+- PhyloP and phastCons conservation across 100 mammalian species
+
+This produced a feature matrix with one row per variant and a mix of model outputs and hand designed features.
+
+### 2.2 Feature engineering
+
+For each variant we constructed several feature groups.
+
+- **Missense prediction**
+
+  AlphaMissense scores and a composite missense score when multiple models were present.
+
+- **Splicing impact**
+
+  SpliceAI scores for donor and acceptor gain and loss, collapsed into a maximum per variant and simple flags for high scoring events.
+
+- **Population frequency**
+
+  gnomAD maximum allele frequency across subcohorts. {{ (snapshot.gnomad_prop_with_data * 100) | round(1) }}% of variants had nonzero frequency data.
+
+- **Conservation**
+
+  Local PhyloP and phastCons values summarizing evolutionary constraint at the variant position.
+
+- **Regulatory and structural context**
+
+  Coding consequence class, protein domain labels, and regulatory type. Structure aware features such as ESM-2 embeddings are available for future runs but are not used in the v1 scoring.
+
+The goal of the feature set is not to chase every possible signal. Instead we prioritize a small set of inputs with clear interpretations that can be reweighted as more data arrives.
+
+### 2.3 Scoring and clustering
+
+We compute a blended impact score per variant that combines:
+
+- missense signal
+
+- splicing signal
+
+- conservation
+
+- allele frequency
+
+Weights are gene specific and can be tuned as new benchmarks appear. In this v1.0 run we use hand set weights designed to favor strong model agreement and very low allele frequency while keeping the score scale interpretable.
+
+To capture patterns beyond a single score, we cluster variants into {{ selection.total_clusters }} groups using domain, mechanism tags, and simple distance metrics over the feature space. These clusters roughly correspond to:
+
+- functional domains such as NBD1, NBD2, and transmembrane regions
+
+- splice region groups
+
+- regulatory contexts
+
+As a check, known pathogenic ABCA4 variants tend to land in higher impact clusters and score well on the blended metric, while known benign or likely benign variants cluster in lower impact regions.
+
+### 2.4 Optimization
+
+With scores and clusters in place, we frame panel design as a small optimization problem.
+
+Given:
+
+- a target panel size {{ selection.k }}
+
+- per cluster coverage targets
+
+- optional cost weights per variant or assay
+
+select a subset of variants that maximizes a simple reward: total impact score plus bonuses for covering new clusters and mechanisms, subject to the panel size constraint.
+
+For ABCA4 v1.0 we use a greedy coverage aware baseline rather than a complex search method. This keeps the behavior easy to reason about and creates a stable reference point for future algorithm work. The optimization layer is modular so we can swap in richer methods such as submodular optimization or reinforcement learning without changing upstream scoring or downstream CRO planning.
+
+### 2.5 CRO pipeline
+
+The selected variants are organized into {{ cro_summary.work_package_count }} work packages by assay modality: {{ cro_summary.assay_modules | join(", ") }}.
+
+Each work package includes:
+
+- a variant list with IDs, mechanisms, domains, and impact scores
+
+- a design matrix specifying conditions, controls, and replicates
+
+- quality control checks and simple success criteria
+
+- material requirements such as constructs, cell lines, and readouts
+
+The goal is to produce something that can be handed to a CRO with minimal back and forth.
+
+### 2.6 Optional protocol drafts
+
+From the structured CRO plan we can generate natural language protocol drafts using a large language model. These drafts describe assay setup, controls, and readouts for each work package.
+
+In the current release they are clearly labeled as prototypes. They are intended for expert review and adaptation, not as drop in experimental SOPs.
+
+---
+
+## 3. Results
+
+### 3.1 Data characteristics
+
+The ABCA4 variant set behaves like a typical disease associated gene panel.
+
+- {{ snapshot.total_variants }} variants of uncertain significance with diverse consequences and mechanisms
+
+- {{ (snapshot.gnomad_prop_with_data * 100) | round(1) }}% of variants with nonzero gnomAD frequency data
+
+- Rare allele frequencies among those observed (mean {{ (snapshot.gnomad_mean_nonzero * 100000) | round(1) }} × 10⁻⁵)
+
+Clinical significance, coding impact, and regulatory type breakdowns are captured in the campaign snapshot and are used to interpret cluster level patterns.
+
+### 3.2 Feature distributions
+
+![Impact score distribution for candidate ABCA4 variants](figures/figure1a_impact.png)
+
+**Figure 1a.** Impact scores for all {{ snapshot.total_variants }} ABCA4 variants (background) versus the {{ selection.k }} variant panel (highlighted in olive). The panel tilts toward the high impact tail while still sampling across the broader distribution.
+
+![gnomAD AF vs impact score for candidate ABCA4 variants](figures/figure1b_af_vs_impact.png)
+
+**Figure 1b.** gnomAD maximum allele frequency versus impact score. Selected variants sit in the low frequency, higher impact region, which is consistent with damaging rare variant expectations.
+
+![SpliceAI score distribution](figures/figure1c_spliceai.png)
+
+**Figure 1c.** SpliceAI score distribution across all variants. The median nonzero SpliceAI score and the fraction of high scoring splice candidates help shape how many splice focused assays we allocate in the final plan.
+
+### 3.3 Optimization results
+
+If we simply took the top {{ selection.k }} variants by impact score, the panel would cluster heavily in one structural region, mainly NBD1 missense variants. This would be score efficient but not very informative across mechanisms.
+
+The coverage aware optimizer trades a small amount of score for diversity. The resulting panel:
+
+- contains {{ selection.k }} variants
+
+- covers {{ selection.clusters_covered }} of {{ selection.total_clusters }} functional clusters
+
+- spans NBD1, NBD2, transmembrane segments, and splice regions
+
+![Optimization and coverage results](figures/figure2_optimization.png)
+
+**Figure 2.** Optimization behavior. Panel (a) compares cluster coverage targets with the number of selected variants per cluster for the top clusters. Panel (b) shows the cumulative impact score as variants are added by rank. The curve illustrates that we retain most of the score of a pure top-score strategy while adding much better coverage.
+
+**Selected variants (top 10 by rank):**
+
+| Rank | Variant ID | Consequence | Impact Score | Cluster |
+
+|------|------------|-------------|--------------|---------|
+
+{%- for row in selection.top10 %}
+
+| {{ row.rank }} | {{ row.variant_id }} | {{ row.consequence }} | {{ "%.3f"|format(row.impact_score) }} | {{ row.cluster_id }} |
+
+{%- endfor %}
+
+The full panel includes variants that are not in the absolute top ten by score but unlock additional mechanisms or regions.
+
+### 3.4 CRO study design
+
+#### What actually gets executed
+
+The {{ selection.k }} selected variants are organized into five work packages that can run in parallel:
+
+| Assay Module | Variants | Readout | Typical Duration |
+
+|-------------|----------|---------|------------------|
+
+| DSF_SEC | 28 | Protein stability and oligomeric state | 1–2 weeks |
+
+| TRAFFICKING | 28 | Cell surface expression and subcellular localization | 2–3 weeks |
+
+| FUNCTIONAL | 28 | Transport activity and substrate kinetics | 3–4 weeks |
+
+| RNA_SEQ_REPORTER | 2 | Expression level and alternative splicing | 1–2 weeks |
+
+| SPLICE_MINIGENE | 2 | Exon inclusion or exclusion patterns | 2–3 weeks |
+
+Each work package includes:
+
+- the variant list with impact scores, domains, and mechanism tags
+
+- assay design matrices with conditions, replicates, and controls
+
+- quality control and QC requirements
+
+- a short written summary of expected deliverables and analysis steps
+
+![Mechanistic distribution of selected variants](figures/figure3_cro.png)
+
+**Figure 3.** Allocation of variants across assay modules and mechanisms. Bars show the number of variants per assay modality, stacked by mechanism tags. This highlights how the {{ selection.k }} variant panel is reused across DSF/SEC, trafficking, functional, RNA reporter, and splice minigene work packages.
+
+The panel is intentionally re used across work packages. When a variant appears to affect both structure and splicing, it may be routed to multiple assays to capture different aspects of its effect.
+
+The selected panel is organized into {{ cro_summary.work_package_count }} work packages:
+
+{%- for wp in cro_summary.work_packages %}
+
+- **{{ wp.wp_id }}** – {{ wp.variant_count }} variants; {{ wp.objective }}.
+
+{%- endfor %}
+
+This structure lets a partner run assays in parallel while keeping analysis and interpretation aligned.
+
+### 3.5 Protocol drafts (optional)
+
+For each work package we generate optional protocol drafts that spell out assay setup, timelines, and key controls in plain language. These drafts are intended as starting points for internal teams or CRO scientists.
+
+In the current release they are clearly labeled as prototypes and require expert editing and adaptation before use at the bench.
+
+---
+
+## 4. Discussion
+
+The ABCA4 v1.0 campaign shows how a small, modular planning stack can turn a large variant backlog into a concrete experimental plan.
+
+### What a partner gets in practice
+
+For a partner lab or CRO, the loop looks like this:
+
+1. **The lab sends a problem.** A diagnostics lab shares a VCF or variant list for a retinal gene plus a rough assay budget and constraints.
+
+2. **Strand plans the experiments.** We score variants with models and priors, select a panel under coverage and cost constraints, and propose specific assay modules.
+
+3. **The work runs at a CRO.** With approval from the lab, we forward a structured campaign spec to a CRO partner that handles constructs, cell work, and readouts.
+
+4. **We interpret and send results upstream.** The CRO returns raw and processed data. We map it back to variants, interpret functional impacts, and deliver an updated view of which variants are likely pathogenic or benign.
+
+5. **We keep the learning signal.** Variant plus assay outcomes feed an internal variant to function atlas that can drive better models and future campaigns.
+
+For ABCA4 this yields a {{ selection.k }} variant panel and a concrete campaign specification that a retinal genetics group can act on.
+
+### Limitations
+
+There are important limitations in this v1.0 slice.
+
+- Model performance is bounded by current training data and may miss rare mechanisms.
+
+- Many variants have limited population frequency or clinical context, which adds uncertainty to AF based priors.
+
+- Functional assays only capture parts of the ABCA4 biology and may not reflect tissue specific or long term effects.
+
+- LLM generated protocols are starting points, not finished SOPs. They require expert review and adaptation.
+
+- The optimizer uses a simple greedy strategy. It is meant as a baseline rather than a final algorithm.
+
+These constraints shape how we recommend using the output: as a structured way to triage and plan experiments, not as a replacement for expert judgment.
+
+### Future directions
+
+Several extensions are straightforward from here:
+
+- **Experimental validation and feedback.** As assays run, we can use outcomes to recalibrate the impact score and panel selection logic.
+
+- **Richer models.** Incorporate DNA and RNA foundation models and virtual cell style predictors into the feature set once they are validated on ABCA4 like tasks.
+
+- **Beyond ABCA4.** Apply the same stack to additional retinal genes, then to cardiovascular, neuro, and oncology panels.
+
+- **From variants to general perturbations.** Replace single gene variants with more general perturbations in functional genomics screens, where the same planning logic can decide which edits or combinations to run.
+
+- **Reinforcement learning for campaign design.** As the atlas grows, use RL to refine panel selection policies based on which experiments produced the most informative or clinically useful outcomes.
+
+- **Productization.** Wrap the pipeline as a campaign product for labs and CROs, with per campaign pricing and a clear interface for submitting variant lists and constraints.
+
+The long term direction is a functional genomics decision and data platform that plans experiments and accumulates a high value atlas of sequence to function. ABCA4 v1.0 is the first proof point toward that goal.
+
+---
+
+## References
+
+1. ClinVar database [https://www.ncbi.nlm.nih.gov/clinvar/](https://www.ncbi.nlm.nih.gov/clinvar/)
+
+2. gnomAD v4.1 [https://gnomad.broadinstitute.org/](https://gnomad.broadinstitute.org/)
+
+3. AlphaMissense [https://github.com/google-deepmind/alphamissense](https://github.com/google-deepmind/alphamissense)
+
+4. SpliceAI [https://github.com/Illumina/SpliceAI](https://github.com/Illumina/SpliceAI)
+
+5. ESM-2 [https://github.com/facebookresearch/esm](https://github.com/facebookresearch/esm)
+
+---
+
+*Report generated automatically from the ABCA4 variant triage pipeline (v1.0, exploratory). Contact: seth@strand.tools*
