@@ -25,6 +25,13 @@ results/**                   # Results and outputs
 mlruns/
 .mlflow/
 
+# Large data files (explicit exclusions for safety)
+*.vcf
+*.vcf.gz
+*.tsv.gz
+*.parquet
+*.csv
+
 # OS/IDE
 .DS_Store
 .vscode/

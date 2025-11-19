@@ -106,13 +106,13 @@ def __(mo, df_annotated, FEATURES_DIR, logger, CAMPAIGN_ROOT, FeatureEngineering
             'conservation': {
                 'path_relative': "data_processed/features/conservation_features.parquet",
                 'computer_class': 'src.features.calculators.conservation.ConservationFeatureComputer',
-                'required_columns': ['variant_id', 'phyloP100way'],
+                'required_columns': ['variant_id', 'phylop_score'],
                 'description': 'phyloP/phastCons conservation scores'
             },
             'regulatory': {
                 'path_relative': "data_processed/features/regulatory_features.parquet",
                 'computer_class': 'src.features.calculators.regulatory.RegulatoryFeatureComputer',
-                'required_columns': ['variant_id', 'gnomad_exome_af', 'gnomad_genome_af', 'gnomad_max_af'],
+                'required_columns': ['variant_id', 'domain_priority_score'],
                 'description': 'domains + gnomAD regulatory features'
             }
         }

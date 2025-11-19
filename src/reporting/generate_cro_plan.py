@@ -24,6 +24,10 @@ try:
     from ..cro.designs import DesignSummaries
     from ..cro.parser import VariantPanel
     from ..cro.workpackages import WorkPackages
+    from .constants import (
+        REPORTS_DIR_NAME, TEMPLATES_DIR_NAME, CRO_STUDY_PLAN_TEMPLATE,
+        CRO_STUDY_PLAN_OUTPUT
+    )
 except ImportError:
     # When run as standalone script
     import sys
@@ -48,8 +52,8 @@ LOGGER = logging.getLogger(__name__)
 
 CAMPAIGN_ROOT = Path(__file__).resolve().parents[2]
 CRO_DATA_DIR = CAMPAIGN_ROOT / "data_processed" / "cro"
-REPORTS_DIR = CAMPAIGN_ROOT / "data_processed" / "reports"
-TEMPLATES_DIR = CAMPAIGN_ROOT / "src" / "reporting" / "templates"
+REPORTS_DIR = CAMPAIGN_ROOT / "data_processed" / REPORTS_DIR_NAME
+TEMPLATES_DIR = CAMPAIGN_ROOT / "src" / "reporting" / TEMPLATES_DIR_NAME
 
 
 def load_all_cro_data() -> tuple[list[VariantPanelRowData], list[WorkPackageData], list[DesignSummaryData], list[DeliverableSpecData]]:
@@ -186,7 +190,7 @@ def render_study_plan(
     work_packages: list,
     design_summaries: list,
     deliverable_specs: list,
-    output_path: Path = REPORTS_DIR / "cro_study_plan.md"
+    output_path: Path = REPORTS_DIR / CRO_STUDY_PLAN_OUTPUT
 ) -> Path:
     """Render the complete CRO study plan using Jinja template.
 
@@ -207,7 +211,7 @@ def render_study_plan(
     templates_dir.mkdir(parents=True, exist_ok=True)
 
     env = Environment(loader=FileSystemLoader(templates_dir))
-    template = env.get_template("cro_study_plan.md.jinja")
+    template = env.get_template(CRO_STUDY_PLAN_TEMPLATE)
 
     # Prepare template context
     context = {
@@ -234,7 +238,7 @@ def render_study_plan(
 
 def create_template() -> Path:
     """Create the Jinja template if it doesn't exist."""
-    template_path = TEMPLATES_DIR / "cro_study_plan.md.jinja"
+    template_path = TEMPLATES_DIR / CRO_STUDY_PLAN_TEMPLATE
     if template_path.exists():
         return template_path
 
@@ -378,7 +382,7 @@ def main() -> None:
     variant_panel, work_packages, design_summaries, deliverable_specs = load_all_cro_data()
 
     # Render study plan
-    output_path = REPORTS_DIR / "cro_study_plan.md"
+    output_path = REPORTS_DIR / CRO_STUDY_PLAN_OUTPUT
     render_study_plan(
         variant_panel, work_packages, design_summaries, deliverable_specs, output_path
     )

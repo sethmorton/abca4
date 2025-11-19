@@ -9,6 +9,11 @@ import pandas as pd
 import numpy as np
 from typing import Dict, List, Tuple, Optional
 from src.config import logger
+from src.reward.constants import (
+    GREEDY_COVERAGE_BONUS, CEM_ITERATIONS, CEM_POPULATION_SIZE,
+    CEM_ELITE_FRACTION, CEM_LAPLACE_SMOOTHING, DEFAULT_QUANTILE_TARGET,
+    MAX_TARGET_SCORE
+)
 
 
 class VariantOptimizer:
@@ -62,9 +67,9 @@ class VariantOptimizer:
                     old_cov = cov.get(cid, 0.0)
                     new_cov = max(old_cov, score)
                     cov_new[cid] = new_cov
-                    # Add small coverage bonus when cluster crosses its threshold (beta=0.05)
+                    # Add small coverage bonus when cluster crosses its threshold
                     if new_cov >= cluster_targets[cid] and old_cov < cluster_targets[cid]:
-                        coverage_bonus = 0.05
+                        coverage_bonus = GREEDY_COVERAGE_BONUS
 
                 gain = score - lambda_penalty * (_penalty(cov_new) - _penalty(cov)) + coverage_bonus
 
@@ -102,7 +107,7 @@ class VariantOptimizer:
 
     @staticmethod
     def select_cem(df: pd.DataFrame, k: int, lambda_penalty: float,
-                  iters: int = 300, pop: int = 120) -> pd.DataFrame:
+                  iters: int = CEM_ITERATIONS, pop: int = CEM_POPULATION_SIZE) -> pd.DataFrame:
         """
         Cross-Entropy Method optimization for variant selection.
         Moved from notebook for reusability.
@@ -145,7 +150,7 @@ class VariantOptimizer:
 
         n = len(df)
         probs = np.ones(n) / n
-        elite_frac = 0.2
+        elite_frac = CEM_ELITE_FRACTION
         elite_size = max(1, int(pop * elite_frac))
 
         best_idx = None
@@ -165,7 +170,7 @@ class VariantOptimizer:
             elite_samples = [samples[i] for i in elite_idx]
 
             flat = np.concatenate(elite_samples)
-            counts = np.bincount(flat, minlength=n) + 1e-6  # laplace smoothing
+            counts = np.bincount(flat, minlength=n) + CEM_LAPLACE_SMOOTHING  # laplace smoothing
             probs = counts / counts.sum()
 
             top_elite = elite_samples[-1]
@@ -238,7 +243,7 @@ class VariantOptimizer:
                         score_col = 'impact_score' if 'impact_score' in cluster_data.columns else 'model_score'
                         if score_col in cluster_data.columns:
                             cluster_targets_default[cluster_name] = min(
-                                cluster_data[score_col].quantile(0.7), 0.9
+                                cluster_data[score_col].quantile(DEFAULT_QUANTILE_TARGET), MAX_TARGET_SCORE
                             )
                         else:
                             cluster_targets_default[cluster_name] = 0.0

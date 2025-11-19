@@ -198,7 +198,7 @@ def __(
     or creating synthetic rows.
     """
     sys.path.insert(0, str(CAMPAIGN_ROOT))
-    from src.data.filter_clinvar_variants import ClinVarVariantFilter, ABCA4VariantFilter
+    from src.data.filter_clinvar_variants import ClinVarVariantFilter
     
     variants_source = "unknown"
 
@@ -213,7 +213,11 @@ def __(
         else:
             # Run the authoritative filter pipeline
             logger.info("Running authoritative ABCA4 variant filtering pipeline...")
-            filter_engine = ABCA4VariantFilter(input_dir=DATA_RAW_DIR, output_dir=VARIANTS_DIR)
+            filter_engine = ClinVarVariantFilter(
+                input_dir=VARIANTS_DIR,
+                output_dir=VARIANTS_DIR,
+                gene_name=GENE_SYMBOL
+            )
             filter_success = filter_engine.run()
 
             if filter_success:
