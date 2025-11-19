@@ -27,7 +27,7 @@ class ClinVarDownloader:
     CLINVAR_BASE_URL = "https://ftp.ncbi.nlm.nih.gov/pub/clinvar"
 
     def __init__(self, output_dir: Optional[Path] = None,
-                 release_date: str = "20251109",
+                 release_date: str = "20251116",
                  expected_vcf_size: Optional[int] = None,
                  expected_tsv_size: Optional[int] = None):
         default_dir = CAMPAIGN_ROOT / "data_raw" / "clinvar"
@@ -35,7 +35,7 @@ class ClinVarDownloader:
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self.release_date = release_date
-        self.expected_vcf_size = expected_vcf_size or 181299219  # Default for 20251109
+        self.expected_vcf_size = expected_vcf_size or 173000000  # Default for 20251116 (~173MB)
         self.expected_tsv_size = expected_tsv_size
 
         # Build URLs from parameters
@@ -51,32 +51,56 @@ class ClinVarDownloader:
         logger.info(f"Downloading {url} to {output_path}")
 
         try:
-            # Use curl with resume support if file exists
-            cmd = ["curl", "-L"]
+            # First attempt with resume if file exists
+            attempt = 0
+            max_attempts = 2
+            
+            while attempt < max_attempts:
+                attempt += 1
+                cmd = ["curl", "-L", "-f"]  # -f: fail on HTTP errors
+                
+                if resume and output_path.exists() and attempt == 1:
+                    cmd.extend(["-C", "-"])  # Resume from where it left off
+                    logger.info(f"Resuming download from {output_path.stat().st_size} bytes")
+                elif output_path.exists():
+                    # Remove file before retry attempts
+                    logger.info("Removing incomplete file before retry...")
+                    output_path.unlink(missing_ok=True)
 
-            if resume and output_path.exists():
-                cmd.extend(["-C", "-"])  # Resume from where it left off
-                logger.info(f"Resuming download from {output_path.stat().st_size} bytes")
+                cmd.extend([
+                    "-o", str(output_path),
+                    "--progress-bar",
+                    "--retry", "3",
+                    "--retry-delay", "5",
+                    url
+                ])
 
-            cmd.extend([
-                "-o", str(output_path),
-                "--progress-bar",
-                "--retry", "3",
-                "--retry-delay", "5",
-                url
-            ])
-
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            if result.returncode != 0:
-                logger.error(f"Download failed: {result.stderr}")
-                return False
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                
+                # Check for specific error about byte ranges
+                if result.returncode != 0 and "doesn't seem to support byte ranges" in result.stderr:
+                    logger.warning(f"Server doesn't support byte ranges, will retry without resume...")
+                    continue
+                
+                if result.returncode != 0:
+                    logger.error(f"Download failed (attempt {attempt}/{max_attempts}): {result.stderr}")
+                    if attempt < max_attempts:
+                        logger.info(f"Retrying... (attempt {attempt + 1}/{max_attempts})")
+                        continue
+                    return False
+                
+                # Successfully downloaded, exit retry loop
+                break
 
             # Verify file size if expected
             actual_size = output_path.stat().st_size
-            if expected_size and actual_size != expected_size:
+            if expected_size and actual_size < expected_size * 0.95:  # Allow 5% tolerance for size changes
                 logger.warning(f"File size mismatch for {output_path.name}: "
                               f"expected {expected_size}, got {actual_size}")
-                # Don't fail on size mismatch - some files may have updated sizes
+                if actual_size < 10000:  # Likely an error page if very small
+                    logger.error(f"Downloaded file suspiciously small ({actual_size} bytes), likely an error")
+                    output_path.unlink(missing_ok=True)
+                    return False
 
             # Verify checksum if provided
             if checksum:
@@ -111,14 +135,14 @@ class ClinVarDownloader:
         vcf_path = self.output_dir / vcf_filename
         tbi_path = self.output_dir / tbi_filename
 
-        # Download VCF
+        # Download VCF without resume (NCBI server doesn't support it)
         if not self.download_file(self.CLINVAR_VCF_URL, vcf_path,
-                                self.expected_vcf_size, vcf_checksum):
+                                self.expected_vcf_size, vcf_checksum, resume=False):
             return False
 
-        # Download TBI index
+        # Download TBI index without resume
         if not self.download_file(self.CLINVAR_VCF_TBI_URL, tbi_path,
-                                checksum=tbi_checksum):
+                                checksum=tbi_checksum, resume=False):
             logger.warning("TBI index download failed, but VCF was successful")
 
         return True
@@ -150,7 +174,15 @@ class ClinVarDownloader:
         # Check file sizes
         vcf_path = self.output_dir / f"clinvar_{self.release_date}.vcf.gz"
         actual_vcf_size = vcf_path.stat().st_size
-        if self.expected_vcf_size and actual_vcf_size != self.expected_vcf_size:
+        
+        # Check for suspiciously small files
+        if actual_vcf_size < 100000000:  # Less than 100MB is suspicious for full ClinVar
+            logger.error(f"VCF file suspiciously small: {actual_vcf_size} bytes (expected ~{self.expected_vcf_size})")
+            logger.error("This may be an error page or incomplete download. Deleting and will retry...")
+            vcf_path.unlink(missing_ok=True)
+            return False
+        
+        if self.expected_vcf_size and actual_vcf_size < self.expected_vcf_size * 0.9:
             logger.warning(f"VCF size mismatch: {actual_vcf_size} vs {self.expected_vcf_size}")
 
         # Quick validation of VCF format
@@ -172,6 +204,8 @@ class ClinVarDownloader:
                             return False
         except Exception as e:
             logger.error(f"VCF validation failed: {e}")
+            logger.error("This file appears to be corrupted or not a valid gzip file. Deleting...")
+            vcf_path.unlink(missing_ok=True)
             return False
 
         logger.info("All ClinVar downloads verified!")
@@ -214,8 +248,8 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Download ClinVar data")
-    parser.add_argument("--release-date", default="20251109",
-                       help="ClinVar release date (default: 20251109)")
+    parser.add_argument("--release-date", default="20251116",
+                       help="ClinVar release date (default: 20251116)")
     parser.add_argument("--output-dir", type=Path,
                        help="Output directory (default: data_raw/clinvar)")
     parser.add_argument("--vcf-checksum", help="Expected SHA256 checksum for VCF file")

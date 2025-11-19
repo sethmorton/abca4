@@ -198,7 +198,7 @@ def __(
     or creating synthetic rows.
     """
     sys.path.insert(0, str(CAMPAIGN_ROOT))
-    from src.data.filter_clinvar_variants import ClinVarVariantFilter
+    from src.data.filter_clinvar_variants import ClinVarVariantFilter, ABCA4VariantFilter
     
     variants_source = "unknown"
 
