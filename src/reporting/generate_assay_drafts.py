@@ -14,7 +14,8 @@ import pandas as pd
 
 from ..config import (
     logger, REQUIRED_VARIANT_COLUMNS, ASSAY_DRAFTS_DIR,
-    LLM_MAX_VARIANTS, RUN_ID, validate_dataframe
+    LLM_MAX_VARIANTS, RUN_ID, validate_dataframe,
+    MECHANISM_MAPPINGS
 )
 from .llm_client import generate_assay_markdown, create_llm_config, AssayDraftError, get_prompt_hash
 
@@ -82,15 +83,10 @@ def prepare_variant_for_prompt(row: pd.Series) -> Dict[str, Any]:
     cluster_parts = cluster_id.split('_', 1)
     if len(cluster_parts) >= 1:
         domain = cluster_parts[0].lower()
-        domain_to_mechanism = {
-            'nbd1': 'nucleotide_binding_disturbance',
-            'nbd2': 'nucleotide_binding_disturbance',
-            'tmd1': 'transmembrane_transport_disruption',
-            'tmd2': 'transmembrane_transport_disruption',
-            'ctd': 'cytoplasmic_domain_dysfunction',
-        }
-        if domain in domain_to_mechanism:
-            mechanism = domain_to_mechanism[domain]
+    if len(cluster_parts) >= 1:
+        domain = cluster_parts[0].lower()
+        if domain in MECHANISM_MAPPINGS:
+            mechanism = MECHANISM_MAPPINGS[domain]
 
     # Step 2: Consequence-based fallback/refinement
     consequence_lower = consequence.lower()

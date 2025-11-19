@@ -11,12 +11,15 @@ import sys
 from typing import Optional, Dict, Any, List
 import requests
 from pyensembl import EnsemblRelease
-from src.config import logger
+from ..config import (
+    logger, DATA_RAW_DIR, ANNOTATIONS_DIR,
+    ENSEMBL_RELEASE, CANONICAL_TRANSCRIPT,
+    # VEP Configuration
+    VEP_SERVER
+)
 
 CAMPAIGN_ROOT = Path(__file__).resolve().parents[2]
 
-CANONICAL_TRANSCRIPT = "ENST00000370225"
-ENSEMBL_RELEASE = 109  # GRCh38
 
 class VariantAnnotator:
     """Add transcript and functional annotations to variants."""

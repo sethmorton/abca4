@@ -144,11 +144,11 @@ def compute_features(c):
     (DATA_PROCESSED / "features").mkdir(exist_ok=True)
 
     with c.cd(str(REPO_ROOT)):
-        _run_script(c, SRC / "features" / "missense.py", "missense feature computation")
-        _run_script(c, SRC / "features" / "splice.py", "splice feature computation")
-        _run_script(c, SRC / "features" / "regulatory.py", "regulatory features")
-        _run_script(c, SRC / "features" / "conservation.py", "conservation features")
-        _run_script(c, SRC / "features" / "assemble_features.py", "feature assembly")
+        _run_script(c, SRC / "features" / "missense" / "calculator.py", "missense feature computation")
+        _run_script(c, SRC / "features" / "splicing" / "calculator.py", "splice feature computation")
+        _run_script(c, SRC / "features" / "regulatory" / "calculator.py", "regulatory features")
+        _run_script(c, SRC / "features" / "conservation" / "calculator.py", "conservation features")
+        _run_script(c, SRC / "features" / "assembly" / "assemble_features.py", "feature assembly")
 
     print("✅ Features computed!")
 

@@ -19,6 +19,10 @@ try:
         MechanismAnnotation, MechanismAnnotationData, MechanismPanel, MechanismRuleCondition,
         MechanismRulesConfig, MechanismTag, VariantPanel, VariantPanelRow
     )
+    from .constants import (
+        CATALOG_DIR_NAME, MECHANISM_RULES_FILENAME, DEFAULT_MECHANISM, DEFAULT_RATIONALE,
+        CRO_DATA_SUBDIR
+    )
 except ImportError:
     # When run as standalone script
     import sys
@@ -37,12 +41,13 @@ logging.basicConfig(
 LOGGER = logging.getLogger(__name__)
 
 CAMPAIGN_ROOT = Path(__file__).resolve().parents[2]
-CRO_DATA_DIR = CAMPAIGN_ROOT / "data_processed" / "cro"
+CRO_DATA_DIR = CAMPAIGN_ROOT / "data_processed" / CRO_DATA_SUBDIR
 
 
 def _load_mechanism_rules(gene: str = "ABCA4") -> MechanismRulesConfig:
     """Load mechanism tagging rules for a specific gene."""
-    rules_path = CAMPAIGN_ROOT / "src" / "cro" / "catalog" / f"{gene.lower()}_mechanisms.yaml"
+    filename = MECHANISM_RULES_FILENAME.format(gene=gene.lower())
+    rules_path = CAMPAIGN_ROOT / "src" / "cro" / CATALOG_DIR_NAME / filename
     if not rules_path.exists():
         raise FileNotFoundError(f"Mechanism rules not found: {rules_path}")
 
@@ -107,8 +112,8 @@ def _apply_mechanism_rules(
 
     # Apply default if no mechanisms matched
     if not mechanisms:
-        default_mechanism = rules.get("default_mechanism", "folding_stability")
-        default_rationale = rules.get("default_rationale", "Conservative assignment")
+        default_mechanism = rules.get("default_mechanism", DEFAULT_MECHANISM)
+        default_rationale = rules.get("default_rationale", DEFAULT_RATIONALE)
         mechanisms.add(default_mechanism)  # type: ignore
         rationales.append(default_rationale)
 

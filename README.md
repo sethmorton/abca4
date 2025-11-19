@@ -4,7 +4,7 @@ This folder contains an end-to-end rare-variant intelligence pipeline for ABCA4,
 
 ## 📂 Project Structure
 
-```
+```text
 abca4/
 ├── 🔬 MAVE Benchmark System (NEW)
 │   ├── src/mave/                 # MAVE evaluation pipeline
@@ -94,204 +94,470 @@ abca4/
     └── templates/                # Report templates
 ```
 
-## 🚀 Quick Start
+## 🚀 Setup & Installation
 
-### 1️⃣ Installation (2 minutes)
+### ⚡ Quick Install (2 minutes)
 
 ```bash
-# Clone and setup
+# Clone and navigate
 git clone <repo>
 cd abca4
-git checkout feature/mave-benchmark-restructure
 
-# Install dependencies with uv
-uv sync --all-extras
+# Install dependencies with uv (includes all bioinformatics & notebook dependencies)
+uv sync
 
-# Verify
-uv run python -c "import pandas, marimo; print('✅ Ready')"
+# Verify installation
+uv run python -c "import pandas, marimo, biopython; print('✅ Ready')"
 ```
 
-**That's it!** No system dependencies, no manual setup needed.
+**System Requirements:** Only `uv` needed (macOS/Linux/Windows). Python 3.10+ automatically managed.
 
-### 2️⃣ Run MAVE Benchmark (10 minutes)
+**Installed Packages:**
+- ✓ NumPy, Pandas, SciPy — data science
+- ✓ BioPython, PySAM, PyEnsembl — bioinformatics
+- ✓ Marimo, Plotly — interactive notebooks & visualization
+- ✓ MLflow, Invoke — pipeline orchestration
+- ✓ Requests, PyYAML — data fetching & config
 
-⚠️ **First Time Only:** Download the MaveDB dataset (~1.4GB):
+### 📥 Download All Required Data
+
+The pipeline uses **external datasets** (ClinVar, gnomAD, SpliceAI, AlphaMissense). These are downloaded automatically on first use, or you can pre-download them:
+
+#### ⚡ Quick Start (Downloads happen automatically)
 
 ```bash
-# Download MaveDB data (only needed once)
+# Just run the notebooks! Data downloads on first use
+uv run python notebooks/02_feature_engineering.py
+
+# Or run the extraction script - it will download what it needs
+uv run python extract_clinvar_variants.py --gene ABCA4
+```
+
+**All downloads go to:** `data_raw/`
+
+#### 📥 Pre-Download All Data (Optional, faster first run)
+
+```bash
+# Option A: Download all at once (recommended)
+uv run invoke data.download
+
+# This will download:
+# ✓ ClinVar variants (~100MB)
+# ✓ gnomAD exome/genome VCFs (~50MB)  
+# ✓ SpliceAI scores (~5MB)
+# ✓ AlphaMissense scores (~200MB)
+# ✅ Total: ~350MB | Takes 10-30 min
+
+# Option B: Download individual datasets
+uv run python src/data/download_clinvar.py        # ClinVar
+uv run python src/data/download_gnomad.py         # gnomAD
+uv run python src/data/download_spliceai.py       # SpliceAI  
+uv run python src/data/download_alphamissense.py  # AlphaMissense
+
+# Option C: Download only ClinVar (minimum for notebooks)
+uv run python src/data/download_clinvar.py
+```
+
+**Note:** Downloads use automatic retry logic and resume on failure, so you can safely interrupt and restart.
+
+### 🧬 MaveDB Data for Benchmark (Optional, but recommended for MAVE)
+
+If you want to run the MAVE benchmark comparison (~10 min runtime), download MaveDB separately:
+
+```bash
+# Create data directory
 mkdir -p data_raw/mave
 cd data_raw/mave
 
-# Download from Zenodo (https://zenodo.org/records/15653325)
+# Download MaveDB dump (~1.4GB)
 wget https://zenodo.org/records/15653325/files/mavedb-dump.20250612164404.zip?download=1 -O mavedb-dump.zip
+
+# Extract
 unzip mavedb-dump.zip
 rm mavedb-dump.zip
 
+# Return to project root
 cd ../../
 ```
 
-Then run the benchmark:
+Then run the MAVE benchmark:
 
 ```bash
 # Run complete pipeline: ingest → normalize → features → evaluate
 uv run python src/mave/run_mave_pipeline.py --phase all -k 10 20 30 50
 
-# Check results
-ls -lh results/mave/*.csv
+# View results
 cat results/mave/mave_BRCA1_DBD_2018_k30_metrics.csv
 ```
 
-### 3️⃣ Explore Results (5 minutes)
+---
+
+## 🧬 Gene-Agnostic Variant Processing (NEW)
+
+This pipeline is fully generalizable to **any gene**! Extract, process, and analyze variants for any gene using the command line tools:
+
+### Extract Variants for Any Gene
 
 ```bash
-# View results as table
-uv run python - << 'EOF'
-import pandas as pd
-df = pd.read_csv("results/mave/mave_BRCA1_DBD_2018_k30_metrics.csv")
-print(df.to_string())
-EOF
+# Extract ABCA4 variants (100 for testing)
+uv run python extract_clinvar_variants.py --gene ABCA4 --limit 100
 
-# Interactive dashboard
-uv run marimo run notebooks/03_optimization_dashboard.py
+# Extract TP53 variants (all VUS)
+uv run python extract_clinvar_variants.py --gene TP53
+
+# Extract BRCA1 variants (all significance levels)
+uv run python extract_clinvar_variants.py --gene BRCA1 --no-vus-filter
+
+# Custom output location
+uv run python extract_clinvar_variants.py --gene MYC --output data_processed/variants/my_gene.parquet
 ```
 
-### ℹ️ Setup Details
+**Output:** `data_processed/variants/{gene}_clinvar_vus.parquet`
 
-**System Requirements:** Only `uv` is needed (Python 3.12+ recommended).
+### Process & Annotate Variants
 
-**What gets installed:**
-- ✓ NumPy, Pandas, SciPy — data science
-- ✓ BioPython, PySAM, PyEnsembl — bioinformatics
-- ✓ Marimo, Plotly — interactive notebooks & visualization
-- ✗ No system dependencies needed
+```bash
+# Filter/standardize variants for a gene
+uv run python -m src.data.filter_clinvar_variants --gene TP53
 
-### 🤖 LLM Assay Drafts Setup
+# Annotate with transcript & genomic context (currently optimized for ABCA4)
+uv run python -m src.annotation.annotate_transcripts
+```
 
-The pipeline includes an optional LLM-powered assay protocol generation step using Groq:
+### Full Gene Workflow
 
-**Required Environment Variable:**
+```bash
+# 1. Extract variants
+uv run python extract_clinvar_variants.py --gene BRCA1 --limit 100
+
+# 2. Compute features
+uv run python -m src.features.missense.calculator
+uv run python -m src.features.splicing.calculator
+uv run python -m src.features.conservation.calculator
+uv run python -m src.features.regulatory.calculator
+
+# 3. Run optimization notebook
+uv run python notebooks/03_optimization_dashboard.py
+```
+
+📖 See **GENE_PROCESSING_WORKFLOW.md** for detailed multi-gene documentation.
+
+---
+
+## 🚀 Quick Start by Use Case
+
+### 📓 I Want to Explore the ABCA4 Data & Notebooks
+
+After downloading data:
+
+```bash
+# Run all notebooks as standalone scripts (no interaction needed)
+uv run python notebooks/01_data_exploration.py         # ~5s - Load 2,116 variants
+uv run python notebooks/02_feature_engineering.py      # ~10s - Compute features
+uv run python notebooks/03_optimization_dashboard.py   # ~5s - Select 30 variants
+
+# Or edit notebooks interactively (with live code editing & output)
+uv run marimo edit notebooks/01_data_exploration.py      # Open in browser
+uv run marimo edit notebooks/02_feature_engineering.py
+uv run marimo edit notebooks/03_optimization_dashboard.py
+```
+
+**With Real Data (100+ ABCA4 variants):**
+
+```bash
+# 1. Extract real variants from ClinVar
+uv run python extract_clinvar_variants.py --gene ABCA4 --limit 100
+
+# 2. Annotate with transcript info
+uv run python -m src.annotation.annotate_transcripts
+
+# 3. Compute features
+uv run python -m src.features.missense.calculator
+uv run python -m src.features.splicing.calculator
+uv run python -m src.features.conservation.calculator
+uv run python -m src.features.regulatory.calculator
+
+# 4. Run notebooks with real data
+uv run python notebooks/02_feature_engineering.py      # Feature loading & clustering
+uv run python notebooks/03_optimization_dashboard.py   # Strand optimization
+```
+
+**Results saved to:**
+- `data_processed/features/` — Computed feature matrices
+- `data_processed/features/variants_scored.parquet` — Scored & clustered variants
+- `data_processed/reports/` — Analysis snapshots
+
+### 🔬 I Want to Run the MAVE Benchmark
+
+```bash
+# Prerequisites: MaveDB data downloaded (see section above)
+
+# Run benchmark with multiple K values (takes ~2 minutes)
+uv run python src/mave/run_mave_pipeline.py --phase all -k 10 20 30 50
+
+# Check results
+ls -lh results/mave/mave_*_k30_metrics.csv
+
+# View one result
+cat results/mave/mave_BRCA1_DBD_2018_k30_metrics.csv
+```
+
+**Benchmark answers:** Does Strand selection recover more true hits than Random/Conservation baselines?
+
+### 🧪 I Want to Run the Complete Pipeline Start-to-Finish
+
+```bash
+# One command to download data + run all analysis
+uv run invoke run-pipeline
+
+# This runs:
+# 1. Download all data (ClinVar, gnomAD, SpliceAI, AlphaMissense)
+# 2. Filter & process ABCA4 variants
+# 3. Add functional annotations
+# 4. Compute all feature matrices
+# 5. Run Strand optimization (select top 30 variants)
+# 6. Generate LLM assay drafts (requires GROQ_API_KEY, optional)
+# 7. Generate final reports & dashboards
+
+# Takes 20-40 minutes depending on LLM and data downloads
+```
+
+### 🤖 I Want to Generate LLM Assay Protocol Drafts
+
+```bash
+# Set API key first
+export GROQ_API_KEY="your-groq-api-key"
+
+# Generate assay drafts for selected variants
+uv run invoke reporting.drafts
+
+# Or generate full pipeline with LLM
+uv run invoke run-pipeline
+
+# Outputs: data_processed/reports/assay_drafts/protocol_drafts/
+```
+
+### 📋 I Want to Create a CRO Study Plan
+
+```bash
+# Generate complete 6-stage CRO pipeline
+uv run invoke cro.plan
+
+# This creates:
+# - Mechanism annotations
+# - Assay module assignments
+# - Work packages
+# - Experimental designs
+# - Deliverable specifications
+# - Validation report
+# - Final markdown study plan
+
+# Outputs: data_processed/cro/ + data_processed/reports/cro_study_plan.md
+```
+
+Or use the interactive dashboard:
+
+```bash
+# Launch CRO planning dashboard
+uv run invoke cro.dashboard
+```
+
+### ⚠️ Troubleshooting Setup
+
+**Problem: `uv` command not found**
+```bash
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Add to PATH (if not automatic)
+export PATH="$HOME/.cargo/bin:$PATH"
+```
+
+**Problem: Data downloads are slow or failing**
+```bash
+# Check internet connection
+ping google.com
+
+# Retry individual downloads
+uv run python src/data/download_clinvar.py
+
+# Or use invoke (handles retries)
+uv run invoke data.download
+```
+
+**Problem: `ModuleNotFoundError` when running notebooks**
+```bash
+# Reinstall dependencies
+uv sync
+
+# Verify dependencies
+uv run python -c "import pandas, marimo, biopython; print('✅ OK')"
+```
+
+**Problem: Notebooks are slow on first run**
+- First run: ~2-5 min (data loading + computation)
+- Subsequent runs: ~5-10 sec (cached data)
+- To speed up: Run datasets sequentially, then use cached results
+
+---
+
+## 🤖 Optional: LLM Assay Protocol Generation
+
+Generate assay protocol drafts from selected variants using LLM (Groq API):
+
+**Setup:**
 ```bash
 export GROQ_API_KEY="your-groq-api-key-here"
 ```
 
-**LLM Configuration (optional overrides):**
+**Generate drafts:**
 ```bash
-export LLM_MODEL="llama-3.3-70b-versatile"  # Default model
-export LLM_TEMP="0.2"                       # Temperature (0.1-0.5)
-export LLM_MAX_TOKENS="600"                 # Max tokens per call
-export LLM_MAX_VARIANTS="12"                # Max variants to process
+invoke reporting.drafts
+
+# Outputs: data_processed/reports/assay_drafts/protocol_drafts/
 ```
 
-**Cost Controls:** Pipeline enforces hard limits to control API costs and fails fast if limits are exceeded.
+**Configuration (optional overrides):**
+```bash
+export LLM_MODEL="llama-3.3-70b-versatile"  # Default: llama-3.3-70b
+export LLM_TEMP="0.2"                       # Temperature (0.1-0.5, default: 0.2)
+export LLM_MAX_TOKENS="600"                 # Max tokens per call (default: 600)
+export LLM_MAX_VARIANTS="12"                # Max variants to process (default: 12)
+```
 
-## 🎯 **NEW: MAVE Benchmark Pipeline**
+**Cost:** ~$0.01-0.05 per full pipeline run (12 variants). Pipeline enforces hard limits to control costs.
 
-The Strand variant selection algorithm is benchmarked against real functional data from MaveDB (Multiplexed Assay of Variant Effect). Evaluates whether the greedy optimization recovers true loss-of-function variants better than baselines.
+## 🎯 MAVE Benchmark: Validate Algorithm Performance
 
-### **North Star Question**
+The Strand variant selection algorithm is benchmarked against real functional data from MaveDB. Measures whether greedy optimization recovers true loss-of-function variants better than baselines.
+
+### The Question
 
 > **"When we pick K variants using Strand selection, do we recover more true hits than Random/Conservation/Oracle baselines?"**
 
-✅ **Answer:** Strand matches oracle (ceiling) performance and beats Random by 5x
+✅ **Answer from benchmarks:** Strand matches oracle (ceiling) performance and beats Random by 5x
 
-### **Quick Results**
+### Quick Setup & Run
 
 ```bash
-# After downloading MaveDB (see Quick Start above):
+# Step 1: Download MaveDB data (1.4GB, one-time)
+mkdir -p data_raw/mave && cd data_raw/mave
+wget https://zenodo.org/records/15653325/files/mavedb-dump.20250612164404.zip?download=1 -O mavedb-dump.zip
+unzip mavedb-dump.zip && rm mavedb-dump.zip
+cd ../../
+
+# Step 2: Run benchmark (10 minutes)
 uv run python src/mave/run_mave_pipeline.py --phase all -k 10 20 30 50
 
-# View results
+# Step 3: View results
 cat results/mave/mave_BRCA1_DBD_2018_k30_metrics.csv
 
-# Full analysis
-cat << 'EOF' | uv run python
+# Step 4: Analyze all results
+python << 'EOF'
 import pandas as pd
-df = pd.concat([pd.read_csv(f) for f in __import__('glob').glob('results/mave/*.csv')], ignore_index=True)
+import glob
+df = pd.concat([pd.read_csv(f) for f in glob.glob('results/mave/*.csv')])
 print(df.groupby('strategy')[['hit_recall', 'hit_precision']].mean().round(4))
 EOF
 ```
 
-### **Available Commands**
+### Benchmark Commands
 
 ```bash
-# Full pipeline (all phases at once)
+# Full pipeline: ingest → normalize → features → evaluate (all datasets, all k values)
 uv run python src/mave/run_mave_pipeline.py --phase all -k 10 20 30 50
 
-# Individual phases (if you want to debug)
-uv run python src/mave/run_mave_pipeline.py --phase ingest      # Load raw data
-uv run python src/mave/run_mave_pipeline.py --phase normalize   # Normalize scores
-uv run python src/mave/run_mave_pipeline.py --phase features    # Add features
-uv run python src/mave/run_mave_pipeline.py --phase eval -k 30  # Run benchmark
-uv run python src/mave/run_mave_pipeline.py --check             # Data quality checks
+# Run individual phases (for debugging)
+uv run python src/mave/run_mave_pipeline.py --phase ingest        # Load MaveDB CSVs
+uv run python src/mave/run_mave_pipeline.py --phase normalize     # Normalize scores & define hits
+uv run python src/mave/run_mave_pipeline.py --phase features      # Add conservation/features
+uv run python src/mave/run_mave_pipeline.py --phase eval -k 30    # Run benchmark
+uv run python src/mave/run_mave_pipeline.py --check               # Validate data quality
 ```
 
-### **Benchmark Results Format**
+### Benchmark Results Format
 
-Results: `results/mave/mave_{dataset_id}_k{k}_metrics.csv`
+Results are saved to: `results/mave/mave_{dataset_id}_k{k}_metrics.csv`
 
 | Column | Meaning |
 |--------|---------|
-| **strategy** | strand, random, conservation, or oracle_functional |
-| **k** | Variants selected (10, 20, 30, 50) |
-| **hit_recall** | % of true hits recovered (higher = better) |
-| **hit_precision** | % of selections that are true hits (higher = better) |
-| **mean_functional_score** | Mean score of selected (lower = more LoF) |
+| **strategy** | Algorithm used: `strand`, `random`, `conservation`, or `oracle_functional` |
+| **k** | Number of variants selected |
+| **hit_recall** | % of true hits recovered by selection (higher = better) |
+| **hit_precision** | % of selected variants that are true hits (higher = better) |
+| **mean_functional_score** | Average functional score of selected variants |
 
-### **Datasets Used**
+### Datasets & Strategies
 
-3 real MAVE datasets from MaveDB:
+**3 Real MAVE Datasets:**
+- **BRCA1_DBD_2018** - BRCA1 DBD domain (5,000 variants)
+- **TP53_DBD_2018** - TP53 DBD domain (2,500 variants)
+- **MLH1_2020** - MLH1 N-terminal (2,000 variants)
 
-- **BRCA1_DBD_2018** - BRCA1 DBD domain (~5,000 variants)
-- **TP53_DBD_2018** - TP53 DBD domain (~2,500 variants)  
-- **MLH1_2020** - MLH1 N-terminal region (~2,000 variants)
+**4 Selection Strategies Compared:**
+1. **Strand** — Greedy optimization with coverage constraints
+2. **Random** — Uniform random selection (baseline)
+3. **Conservation** — Top-K by sequence conservation (baseline)
+4. **Oracle** — Top-K by true functional score (performance ceiling)
 
-### **Selection Strategies Compared**
+## 📊 Explore Available Commands
 
-1. **Strand** - Greedy optimization + coverage constraints (λ=0.6)
-2. **Random** - Uniform random selection (baseline)
-3. **Conservation** - Top-K by sequence conservation (baseline)
-4. **Oracle Functional** - Top-K by true functional score (ceiling)
+### All Available Tasks
 
-## ⚡ Ready-to-Run ABCA4 Pipeline
-
-**This pipeline is production-ready!** Core ClinVar data is pre-processed and included, so you can start analyzing immediately. Additional datasets (gnomAD, SpliceAI, AlphaMissense) will be downloaded automatically as needed:
+List all available tasks:
 
 ```bash
-# Run the complete analysis pipeline (takes ~20 seconds + LLM calls)
-uv run python notebooks/01_data_exploration.py     # Load & explore 2,116 variants
-uv run python notebooks/02_feature_engineering.py  # Compute features & scores
-uv run python notebooks/03_optimization_dashboard.py # Select 30 optimal variants
-uv run invoke reporting.drafts                     # Generate LLM assay drafts
+uv run invoke -l
 
-# View results
-cat data_processed/reports/report_snapshot.md      # Analysis summary
-head -10 data_processed/reports/variants_selected.csv  # Top variants
-ls data_processed/reports/assay_drafts/protocol_drafts/  # Assay protocols
+# Main commands:
+uv run invoke setup-dev              # Install dev environment
+uv run invoke run-pipeline           # End-to-end pipeline
+uv run invoke data.download          # Download all datasets
+uv run invoke data.process           # Filter variants for gene
+uv run invoke features.compute       # Compute all features
+uv run invoke reporting.generate     # Generate reports
+uv run invoke reporting.drafts       # Generate LLM assay drafts
+uv run invoke notebook.explore       # Launch data exploration
+uv run invoke notebook.tune          # Launch feature engineering
+uv run invoke notebook.optimize      # Launch optimization dashboard
+uv run invoke cro.plan               # Generate CRO study plan
 ```
 
-### Running Invoke Tasks
+### Invoke Task Reference
 
-Run tasks from the repo root:
+For detailed task documentation:
 
 ```bash
-invoke -l                        # list all available tasks
+# See all tasks
+uv run invoke -l
 
-# Data & feature pipeline
-invoke download-data             # fetch ClinVar/gnomAD/SpliceAI/AlphaMissense (continues if some fail)
-invoke run-pipeline              # execute full feature computation pipeline
-invoke run-optimization          # rank variants & log to MLflow
-invoke reporting.drafts          # generate LLM-powered assay drafts
-invoke generate-report           # generate snapshot reports
+# Data pipeline tasks
+uv run invoke data.download              # Download ClinVar, gnomAD, SpliceAI, AlphaMissense
+uv run invoke data.process               # Filter variants for specified gene
+
+# Feature computation
+uv run invoke features.compute           # Compute all feature matrices
+
+# Reporting & drafts
+uv run invoke reporting.generate         # Generate snapshot reports
+uv run invoke reporting.drafts           # Generate LLM-powered assay protocol drafts
+uv run invoke reporting.pdf              # Generate PDF from HTML report
+
+# Notebooks (interactive editing)
+uv run invoke notebook.explore           # Edit data exploration notebook
+uv run invoke notebook.tune              # Edit feature engineering notebook
+uv run invoke notebook.optimize          # Edit optimization dashboard
 
 # CRO study planning
-invoke cro.plan                  # generate complete CRO study plan (all stages)
-invoke cro.parse                 # Stage 1: Parse variant report
-invoke cro.annotate              # Stage 2: Add mechanism annotations
-invoke cro.assign                # Stage 3: Assign assay modules
-invoke cro.workpackages          # Stage 4: Create work packages
-invoke cro.designs               # Stage 5: Generate experimental designs
-invoke cro.deliverables          # Stage 6: Define deliverables
-invoke cro.dashboard             # launch CRO planning dashboard
+uv run invoke cro.plan                   # Generate complete CRO study plan (all stages)
+uv run invoke cro.parse                  # Stage 1: Parse variant report
+uv run invoke cro.annotate               # Stage 2: Mechanism annotations
+uv run invoke cro.assign                 # Stage 3: Assay assignments
+uv run invoke cro.workpackages           # Stage 4: Create work packages
+uv run invoke cro.designs                # Stage 5: Experimental designs
+uv run invoke cro.deliverables           # Stage 6: Deliverable specs
+uv run invoke cro.validate               # Validate pipeline outputs
+uv run invoke cro.dashboard              # Interactive CRO planning dashboard
 ```
 
 ### 🧬 Running the Pipeline on Other Genes
@@ -317,14 +583,14 @@ cp config/abca4.yaml config/your_gene.yaml
 
 Ensure ClinVar data is downloaded (shared across genes):
 ```bash
-invoke download-data
+uv run invoke data.download
 ```
 
 #### Step 3: Run Pipeline
 
 ```bash
 # Run for your gene (defaults to ABCA4 if --gene not specified)
-invoke run-pipeline --gene YOUR_GENE
+uv run invoke run-pipeline --gene YOUR_GENE
 ```
 
 Or run individual steps:
@@ -353,36 +619,37 @@ scoring_weights:
   # ... weights for impact score
 ```
 
-### Interactive Notebooks
+### 📓 Running Notebooks: 3 Ways
 
-Edit notebooks interactively:
+All notebooks are stored as pure `.py` files (Git-friendly and executable as scripts).
+
+#### 1️⃣ **Edit Interactively** (Recommended for exploration)
 
 ```bash
+# Opens notebook in browser with live code editing & output
 uv run marimo edit notebooks/01_data_exploration.py
 uv run marimo edit notebooks/02_feature_engineering.py
 uv run marimo edit notebooks/03_optimization_dashboard.py
 uv run marimo edit notebooks/04_fasta_exploration.py
-uv run marimo edit notebooks/05_cro_plan.py           # CRO study planning
+uv run marimo edit notebooks/05_cro_plan.py
 ```
 
-### Running Notebooks as Dashboards
-
-Deploy as standalone interactive dashboards:
+#### 2️⃣ **Run as Standalone App** (Recommended for dashboards)
 
 ```bash
-uv run marimo run notebooks/01_data_exploration.py --headless
-uv run marimo run notebooks/03_optimization_dashboard.py --headless
-uv run marimo run notebooks/05_cro_plan.py --headless         # CRO planning
+# Deploy as interactive web app (no editing, just viewing & interaction)
+uv run marimo run notebooks/01_data_exploration.py
+uv run marimo run notebooks/03_optimization_dashboard.py
+uv run marimo run notebooks/05_cro_plan.py
 ```
 
-### Running Notebooks as Scripts
-
-Execute notebooks as Python scripts (fully self-contained, no external dependencies):
+#### 3️⃣ **Execute as Python Script** (Fastest, no UI)
 
 ```bash
-uv run python notebooks/01_data_exploration.py     # ~5s - Load 2,116 variants
-uv run python notebooks/02_feature_engineering.py  # ~10s - Compute all features
-uv run python notebooks/03_optimization_dashboard.py # ~5s - Select 30 variants
+# Just run as normal Python script (self-contained, no browser)
+uv run python notebooks/01_data_exploration.py     # ~5s - Load variants
+uv run python notebooks/02_feature_engineering.py  # ~10s - Compute features
+uv run python notebooks/03_optimization_dashboard.py # ~5s - Select variants
 ```
 
 ## 📊 Notebook Guide
@@ -454,7 +721,7 @@ The campaign includes a complete **CRO Study Plan Pipeline** that converts varia
 
 ### CRO Pipeline Overview
 
-```
+```text
 Selected Variants → Mechanism Annotation → Assay Assignment → Work Packages → Designs → Deliverables → Validation → Study Plan
      ↓              ↓                    ↓                ↓            ↓        ↓           ↓          ↓
    Stage 1        Stage 2              Stage 3          Stage 4      Stage 5    Stage 6      Stage 8     Stage 7
@@ -470,14 +737,14 @@ uv run invoke cro.plan
 uv run marimo run notebooks/05_cro_plan.py --headless
 
 # Individual CRO pipeline stages (for development/debugging)
-invoke cro.parse        # Stage 1: Parse variants
-invoke cro.annotate     # Stage 2: Add mechanisms
-invoke cro.assign       # Stage 3: Assign assays
-invoke cro.workpackages # Stage 4: Create work packages
-invoke cro.designs      # Stage 5: Generate designs
-invoke cro.deliverables # Stage 6: Define deliverables
-invoke cro.validate     # Stage 8: Run validation
-# invoke cro.plan runs stages 1-6, then validation (8), then plan generation (7)
+uv run invoke cro.parse        # Stage 1: Parse variants
+uv run invoke cro.annotate     # Stage 2: Add mechanisms
+uv run invoke cro.assign       # Stage 3: Assign assays
+uv run invoke cro.workpackages # Stage 4: Create work packages
+uv run invoke cro.designs      # Stage 5: Generate designs
+uv run invoke cro.deliverables # Stage 6: Define deliverables
+uv run invoke cro.validate     # Stage 8: Run validation
+# uv run invoke cro.plan runs stages 1-6, then validation (8), then plan generation (7)
 ```
 
 ### CRO Pipeline Stages
@@ -526,7 +793,7 @@ invoke cro.validate     # Stage 8: Run validation
 
 The pipeline generates a complete study package:
 
-```
+```text
 data_processed/cro/
 ├── variant_panel.parquet        # Structured variant data
 ├── mechanism_panel.json         # Mechanism annotations
@@ -585,7 +852,7 @@ rules:
 
 ## 🔬 Overall Pipeline Flow
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │          MAVE BENCHMARK SYSTEM (NEW)                        │
 │  Evaluate Strand against real functional data               │

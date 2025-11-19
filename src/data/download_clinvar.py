@@ -10,6 +10,9 @@ import sys
 from pathlib import Path
 from typing import Optional
 import logging
+from src.data.constants import (
+    CLINVAR_BASE_URL, CLINVAR_RELEASE_DATE, CLINVAR_EXPECTED_VCF_SIZE
+)
 
 # Setup logging
 logging.basicConfig(
@@ -23,11 +26,8 @@ CAMPAIGN_ROOT = Path(__file__).resolve().parents[2]
 class ClinVarDownloader:
     """Download and verify ClinVar data files."""
 
-    # Parameterized URLs - can be overridden via config
-    CLINVAR_BASE_URL = "https://ftp.ncbi.nlm.nih.gov/pub/clinvar"
-
     def __init__(self, output_dir: Optional[Path] = None,
-                 release_date: str = "20251116",
+                 release_date: str = CLINVAR_RELEASE_DATE,
                  expected_vcf_size: Optional[int] = None,
                  expected_tsv_size: Optional[int] = None):
         default_dir = CAMPAIGN_ROOT / "data_raw" / "clinvar"
@@ -35,13 +35,13 @@ class ClinVarDownloader:
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self.release_date = release_date
-        self.expected_vcf_size = expected_vcf_size or 173000000  # Default for 20251116 (~173MB)
+        self.expected_vcf_size = expected_vcf_size or CLINVAR_EXPECTED_VCF_SIZE
         self.expected_tsv_size = expected_tsv_size
 
         # Build URLs from parameters
-        self.CLINVAR_VCF_URL = f"{self.CLINVAR_BASE_URL}/vcf_GRCh38/clinvar_{self.release_date}.vcf.gz"
-        self.CLINVAR_VCF_TBI_URL = f"{self.CLINVAR_BASE_URL}/vcf_GRCh38/clinvar_{self.release_date}.vcf.gz.tbi"
-        self.CLINVAR_TSV_URL = f"{self.CLINVAR_BASE_URL}/tab_delimited/variant_summary.txt.gz"
+        self.CLINVAR_VCF_URL = f"{CLINVAR_BASE_URL}/vcf_GRCh38/clinvar_{self.release_date}.vcf.gz"
+        self.CLINVAR_VCF_TBI_URL = f"{CLINVAR_BASE_URL}/vcf_GRCh38/clinvar_{self.release_date}.vcf.gz.tbi"
+        self.CLINVAR_TSV_URL = f"{CLINVAR_BASE_URL}/tab_delimited/variant_summary.txt.gz"
 
     def download_file(self, url: str, output_path: Path,
                      expected_size: Optional[int] = None,
@@ -248,8 +248,8 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Download ClinVar data")
-    parser.add_argument("--release-date", default="20251116",
-                       help="ClinVar release date (default: 20251116)")
+    parser.add_argument("--release-date", default=CLINVAR_RELEASE_DATE,
+                       help=f"ClinVar release date (default: {CLINVAR_RELEASE_DATE})")
     parser.add_argument("--output-dir", type=Path,
                        help="Output directory (default: data_raw/clinvar)")
     parser.add_argument("--vcf-checksum", help="Expected SHA256 checksum for VCF file")

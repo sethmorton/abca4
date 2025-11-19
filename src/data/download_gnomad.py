@@ -11,6 +11,10 @@ import sys
 from pathlib import Path
 from typing import Optional
 from urllib.parse import quote
+from src.data.constants import (
+    GNOMAD_VERSION, GNOMAD_BASE_URL, GNOMAD_DEFAULT_CHROM,
+    GNOMAD_DEFAULT_START, GNOMAD_DEFAULT_END
+)
 
 # Setup logging
 logging.basicConfig(
@@ -26,15 +30,15 @@ class GnomADDownloader:
 
     # Default ABCA4 region: chr1:93,500,000-95,000,000 (±500kb from gene)
     # ABCA4 gene coordinates (GRCh38): chr1:94,040,717-94,406,815
-    DEFAULT_CHROM = "1"
-    DEFAULT_START = 93500000  # 93,500,000 (500kb upstream)
-    DEFAULT_END = 95000000    # 95,000,000 (500kb downstream)
+    DEFAULT_CHROM = GNOMAD_DEFAULT_CHROM
+    DEFAULT_START = GNOMAD_DEFAULT_START
+    DEFAULT_END = GNOMAD_DEFAULT_END
 
     # gnomAD base URLs
-    GNOMAD_BASE_URL = "https://storage.googleapis.com/download/storage/v1/b/gcp-public-data--gnomad/o"
+    GNOMAD_BASE_URL = GNOMAD_BASE_URL
 
     def __init__(self, output_dir: Optional[Path] = None,
-                 version: str = "4.1",
+                 version: str = GNOMAD_VERSION,
                  chrom: str = DEFAULT_CHROM,
                  start: Optional[int] = None,
                  end: Optional[int] = None,
@@ -343,14 +347,14 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Download and extract gnomAD data")
-    parser.add_argument("--version", default="4.1",
-                       help="gnomAD version (default: 4.1)")
-    parser.add_argument("--chrom", default="1",
-                       help="Chromosome number (default: 1)")
+    parser.add_argument("--version", default=GNOMAD_VERSION,
+                       help=f"gnomAD version (default: {GNOMAD_VERSION})")
+    parser.add_argument("--chrom", default=GNOMAD_DEFAULT_CHROM,
+                       help=f"Chromosome number (default: {GNOMAD_DEFAULT_CHROM})")
     parser.add_argument("--start", type=int,
-                       help="Region start position (default: 94400000 for ABCA4)")
+                       help=f"Region start position (default: {GNOMAD_DEFAULT_START} for ABCA4)")
     parser.add_argument("--end", type=int,
-                       help="Region end position (default: 95200000 for ABCA4)")
+                       help=f"Region end position (default: {GNOMAD_DEFAULT_END} for ABCA4)")
     parser.add_argument("--output-dir", type=Path,
                        help="Output directory (default: campaigns/abca4/data_raw/gnomad)")
     parser.add_argument("--download-full", action="store_true",

@@ -1,0 +1,108 @@
+# ABCA4 Gene Configuration
+# Specifications for ABCA4 variant analysis and optimization
+
+# Required fields for clustering
+gene_name: "ABCA4"
+mode: "greedy"
+features:
+  - "phylop_score"
+  - "missense_combined_score"
+  - "spliceai_max_score"
+  - "domain_priority_score"
+
+gene:
+  symbol: "ABCA4"
+  ensembl_id: "ENSG00000198691"
+  canonical_transcript: "ENST00000370521"
+  chromosome: "1"
+  strand: "-"
+  start: 94377141
+  end: 94490200
+
+# Sequence context
+sequence:
+  fasta_file: "data_raw/abca4.fasta"
+  transcript_fasta_file: "data_raw/abca4_transcript.fasta"
+
+# Variant clustering configuration
+# Used for coverage constraints in optimization
+clustering:
+  method: "kmeans"
+  n_clusters: 4
+  features_for_clustering:
+    - "phylop_score"
+    - "missense_combined_score"
+    - "spliceai_max_score"
+    - "domain_priority_score"
+  
+# Optimization constraints
+optimization:
+  lambda_penalty: 0.6  # Balance between model score and diversity
+  min_cluster_coverage: 0.5  # Minimum fraction of each cluster to select from
+  variant_limit: 30  # Default number of variants to select
+  
+# Impact score computation
+impact_scoring:
+  model_weight: 0.6      # Strand model prediction
+  conservation_weight: 0.2  # Sequence conservation
+  domain_weight: 0.1       # Protein domain importance
+  splice_weight: 0.1       # Splice site prediction
+  af_penalty: 0.3          # Allele frequency penalty
+  
+# Feature thresholds for quality control
+feature_requirements:
+  missense:
+    min_non_null_pct: 40  # AlphaMissense is sparse
+    required_columns:
+      - "alphamissense_score"
+      - "missense_combined_score"
+  
+  splice:
+    min_non_null_pct: 50
+    required_columns:
+      - "spliceai_max_score"
+  
+  conservation:
+    min_non_null_pct: 50
+    required_columns:
+      - "phylop_score"
+      - "conservation_combined_score"
+  
+  regulatory:
+    min_non_null_pct: 40
+    required_columns:
+      - "domain_priority_score"
+      - "rarity_score"
+
+# Domain definitions for ABCA4
+domains:
+  - name: "NBD1"
+    region: "Nucleotide Binding Domain 1"
+    start_aa: 1
+    end_aa: 600
+    priority: 1.0
+  
+  - name: "NBD2"
+    region: "Nucleotide Binding Domain 2"
+    start_aa: 1000
+    end_aa: 1200
+    priority: 1.0
+  
+  - name: "TMD"
+    region: "Transmembrane Domain"
+    start_aa: 300
+    end_aa: 900
+    priority: 0.8
+
+# CRO study configuration
+cro:
+  study_type: "functional_validation"
+  phenotype: "Stargardt Macular Degeneration"
+  cell_model: "retinal_pigment_epithelial"
+  readout: "protein_localization"
+  assay_modules:
+    - "protein_expression"
+    - "subcellular_localization"
+    - "trafficking"
+    - "functional_rescue"
+

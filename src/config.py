@@ -44,6 +44,20 @@ SCORED_VARIANTS_FILE = "variants_scored.parquet"
 # Demo mode settings
 DEMO_MODE_ENABLED = False  # Set to True to enable synthetic data fallbacks
 
+# Shared Constants
+ENSEMBL_RELEASE = 109
+CANONICAL_TRANSCRIPT = "ENST00000370225"
+VEP_SERVER = "https://rest.ensembl.org"
+
+# Mechanism Mappings
+MECHANISM_MAPPINGS = {
+    'nbd1': 'nucleotide_binding_disturbance',
+    'nbd2': 'nucleotide_binding_disturbance',
+    'tmd1': 'transmembrane_transport_disruption',
+    'tmd2': 'transmembrane_transport_disruption',
+    'ctd': 'cytoplasmic_domain_dysfunction',
+}
+
 
 # LLM Configuration for Assay Draft Generation
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")

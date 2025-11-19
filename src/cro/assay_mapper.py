@@ -20,6 +20,7 @@ try:
         AssayCatalogConfig, AssayModule, AssayModuleId, MechanismAnnotation,
         MechanismPanel, MechanismTag
     )
+    from .constants import CATALOG_DIR_NAME, ASSAY_CATALOG_FILENAME, CRO_DATA_SUBDIR
 except ImportError:
     # When run as standalone script
     import sys
@@ -39,12 +40,12 @@ logging.basicConfig(
 LOGGER = logging.getLogger(__name__)
 
 CAMPAIGN_ROOT = Path(__file__).resolve().parents[2]
-CRO_DATA_DIR = CAMPAIGN_ROOT / "data_processed" / "cro"
+CRO_DATA_DIR = CAMPAIGN_ROOT / "data_processed" / CRO_DATA_SUBDIR
 
 
 def load_assay_catalog() -> AssayCatalog:
     """Load assay module catalog."""
-    catalog_path = CAMPAIGN_ROOT / "src" / "cro" / "catalog" / "assay_modules.yaml"
+    catalog_path = CAMPAIGN_ROOT / "src" / "cro" / CATALOG_DIR_NAME / ASSAY_CATALOG_FILENAME
     if not catalog_path.exists():
         raise FileNotFoundError(f"Assay catalog not found: {catalog_path}")
 
