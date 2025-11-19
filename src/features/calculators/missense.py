@@ -11,7 +11,7 @@ import sys
 from typing import Optional, List
 from src.config import logger
 
-CAMPAIGN_ROOT = Path(__file__).resolve().parents[2]
+CAMPAIGN_ROOT = Path(__file__).resolve().parents[3]
 
 class MissenseFeatureComputer:
     """Compute missense-specific features for variants."""

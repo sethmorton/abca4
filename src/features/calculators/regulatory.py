@@ -12,7 +12,7 @@ import pysam
 from pyensembl import EnsemblRelease
 from src.config import logger
 
-CAMPAIGN_ROOT = Path(__file__).resolve().parents[2]
+CAMPAIGN_ROOT = Path(__file__).resolve().parents[3]
 CANONICAL_TRANSCRIPT = "ENST00000370225"
 ENSEMBL_RELEASE = 109
 

@@ -93,25 +93,25 @@ def __(mo, df_annotated, FEATURES_DIR, logger, CAMPAIGN_ROOT, FeatureEngineering
         REQUIRED_FEATURE_SLICES = {
             'missense': {
                 'path_relative': "data_processed/features/missense_features.parquet",
-                'computer_class': 'src.features.missense.MissenseFeatureComputer',
+                'computer_class': 'src.features.calculators.missense.MissenseFeatureComputer',
                 'required_columns': ['variant_id', 'alphamissense_score'],
                 'description': 'AlphaMissense + ESM features'
             },
             'splice': {
                 'path_relative': "data_processed/features/splice_features.parquet",
-                'computer_class': 'src.features.splice.SpliceFeatureComputer',
+                'computer_class': 'src.features.calculators.splice.SpliceFeatureComputer',
                 'required_columns': ['variant_id', 'spliceai_max_score'],
                 'description': 'SpliceAI features'
             },
             'conservation': {
                 'path_relative': "data_processed/features/conservation_features.parquet",
-                'computer_class': 'src.features.conservation.ConservationFeatureComputer',
+                'computer_class': 'src.features.calculators.conservation.ConservationFeatureComputer',
                 'required_columns': ['variant_id', 'phyloP100way'],
                 'description': 'phyloP/phastCons conservation scores'
             },
             'regulatory': {
                 'path_relative': "data_processed/features/regulatory_features.parquet",
-                'computer_class': 'src.features.regulatory.RegulatoryFeatureComputer',
+                'computer_class': 'src.features.calculators.regulatory.RegulatoryFeatureComputer',
                 'required_columns': ['variant_id', 'gnomad_exome_af', 'gnomad_genome_af', 'gnomad_max_af'],
                 'description': 'domains + gnomAD regulatory features'
             }

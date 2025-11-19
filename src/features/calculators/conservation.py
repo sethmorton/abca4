@@ -8,7 +8,7 @@ import pandas as pd
 import requests
 from src.config import logger
 
-CAMPAIGN_ROOT = Path(__file__).resolve().parents[2]
+CAMPAIGN_ROOT = Path(__file__).resolve().parents[3]
 
 
 class ConservationFeatureComputer:
