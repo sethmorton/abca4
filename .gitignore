@@ -39,3 +39,7 @@ mlruns/
 *.swp
 *.swo
 *~
+
+old_memo.txt
+
+impact_score/output/
